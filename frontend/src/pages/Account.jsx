@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { FiUpload, FiEdit2, FiX, FiUser, FiCreditCard, FiPlus, FiTrash2 } from 'react-icons/fi';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
+import { getMe, updateUserInfo } from '../api/authApi'; // ✅ API 함수 import
 import './style/Account.scss';
 
 const defaultCoverImages = [
@@ -17,47 +18,88 @@ const defaultProfileOptions = [
   { color: '#2f6a57', icon: FiUser },
   { color: '#5b7a6b', icon: FiUser },
   { color: '#d4e8df', icon: FiUser },
-  { color: '#ffe5d9', icon: FiUser }, // 파스텔 피치
-  { color: '#ffd6e8', icon: FiUser }, // 파스텔 핑크
-  { color: '#d6e5fa', icon: FiUser }, // 파스텔 블루
-  { color: '#fff4d6', icon: FiUser }, // 파스텔 옐로우
-  { color: '#e8d5ff', icon: FiUser }, // 파스텔 퍼플
-  { color: '#d5f4e6', icon: FiUser }, // 파스텔 민트
-  { color: '#ffe0cc', icon: FiUser }, // 파스텔 오렌지
-  { color: '#f0e6ff', icon: FiUser }, // 파스텔 라벤더
-  { color: '#e0f2f1', icon: FiUser }, // 파스텔 틸
+  { color: '#ffe5d9', icon: FiUser },
+  { color: '#ffd6e8', icon: FiUser },
+  { color: '#d6e5fa', icon: FiUser },
+  { color: '#fff4d6', icon: FiUser },
+  { color: '#e8d5ff', icon: FiUser },
+  { color: '#d5f4e6', icon: FiUser },
+  { color: '#ffe0cc', icon: FiUser },
+  { color: '#f0e6ff', icon: FiUser },
+  { color: '#e0f2f1', icon: FiUser },
 ];
 
 const Account = () => {
   const [activeTab, setActiveTab] = useState('account');
-  
-  // localStorage에서 사용자 정보 불러오기
-  const loadUserInfo = () => {
-    const stored = localStorage.getItem('userInfo');
-    if (stored) {
-      try {
-        return JSON.parse(stored);
-      } catch (error) {
-        console.error('Failed to load user info', error);
-      }
-    }
-    return {
-      name: 'Tomhoon',
-      email: 'gnsdl9079@gmail.com',
-      password: '********',
-      phone: '010-5555-5555',
-      address: '경기도 화성시 화성읍 도레미아파트 101동 101호',
-      birthDate: '1999-99-99',
-    };
-  };
 
-  const [userInfo, setUserInfo] = useState(loadUserInfo);
+  // ✅ 사용자 정보 State (초기값은 비워둠)
+  const [userInfo, setUserInfo] = useState({
+    name: '',
+    email: '',
+    password: '********', // 보안상 마스킹
+    phone: '',
+    address: '',
+    birthDate: '',
+  });
+
+  const [loading, setLoading] = useState(true); // 로딩 상태
+
+  // ✅ 1. 백엔드에서 내 정보 불러오기 (useEffect)
+  useEffect(() => {
+    const fetchUserData = async () => {
+      try {
+        console.log("🚀 내 정보 불러오기 시작...");
+        
+        // API 호출
+        const response = await getMe();
+        console.log("👉 서버 응답:", response);
+
+        // 성공 여부 체크 (response가 있고, success가 true일 때)
+        if (response && (response.success || response.resultCode === 200)) {
+          const user = response.data;
+          
+          setUserInfo({
+            name: user.name || '',
+            email: user.email || '',
+            password: '********', 
+            // 백엔드 phoneNumber -> 프론트 phone 매핑
+            phone: user.phoneNumber || '', 
+            address: user.address || '',
+            birthDate: user.birthDate ? user.birthDate.split('T')[0] : '',
+          });
+
+          // 로컬스토리지 동기화
+          if (user.name) localStorage.setItem('userName', user.name);
+          if (user.email) localStorage.setItem('userEmail', user.email);
+          
+        } else {
+          console.warn("❌ 데이터를 가져왔지만 실패 응답임:", response);
+          // 실패했다면 로그인 페이지로 튕기게 할 수도 있음 (선택사항)
+        }
+
+      } catch (error) {
+        console.error('❌ 내 정보 불러오기 실패 (에러):', error);
+        // 토큰이 만료되었거나 없을 때 여기서 에러가 날 수 있음
+      } finally {
+        // 🚨 [핵심] 성공하든 실패하든 로딩은 무조건 끈다!
+        setLoading(false);
+        console.log("🏁 로딩 종료");
+      }
+    };
+
+    fetchUserData();
+  }, []);
+
   const [editingField, setEditingField] = useState(null);
   const [tempValue, setTempValue] = useState('');
+
+  // UI용 상태들
   const [coverImage, setCoverImage] = useState(defaultCoverImages[0]);
   const [profileOption, setProfileOption] = useState(defaultProfileOptions[0]);
   const [showCoverModal, setShowCoverModal] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
+
+  // 결제 수단 (로컬 스토리지 사용 유지)
   const [paymentMethods, setPaymentMethods] = useState([]);
   const [isAddCardModalOpen, setIsAddCardModalOpen] = useState(false);
   const [newCard, setNewCard] = useState({
@@ -69,30 +111,59 @@ const Account = () => {
     saveInfo: true,
   });
 
-  const handleChange = (field, value) => {
-    const updatedInfo = {
-      ...userInfo,
-      [field]: value,
-    };
-    setUserInfo(updatedInfo);
-    // localStorage에 저장
-    localStorage.setItem('userInfo', JSON.stringify(updatedInfo));
-    
-    // 이름이 변경되면 Header에 알림
-    if (field === 'name') {
-      window.dispatchEvent(new Event('userInfoChanged'));
+  // ✅ 2. 수정 버튼 클릭 시
+  const handleEditClick = (field) => {
+    setEditingField(field);
+    // 비밀번호 수정일 경우 빈 값으로 시작
+    if (field === 'password') {
+      setTempValue('');
+    } else {
+      setTempValue(userInfo[field]);
     }
   };
 
-  const handleEditClick = (field) => {
-    setEditingField(field);
-    setTempValue(userInfo[field]);
-  };
+  // ✅ 3. 저장 버튼 클릭 시 (백엔드 전송)
+  const handleSave = async (field) => {
+    try {
+      // 보낼 데이터 준비
+      const updateData = {};
 
-  const handleSave = (field) => {
-    handleChange(field, tempValue);
-    setEditingField(null);
-    setTempValue('');
+      if (field === 'name') updateData.displayName = tempValue; // 백엔드가 displayName 또는 name을 받음 (authApi에서 처리됨)
+      if (field === 'phone') updateData.phone = tempValue;
+      if (field === 'address') updateData.address = tempValue;
+      if (field === 'birthDate') updateData.birthDate = tempValue;
+      if (field === 'password') updateData.password = tempValue; // 비밀번호 변경
+
+      // 이름은 특별히 처리 (authApi나 백엔드 로직에 맞춤)
+      // 여기서는 UI의 field명과 백엔드 필드명을 맞추기 위해 
+      // api 호출 시 객체 키를 동적으로 할당
+      const payload = { [field]: tempValue };
+
+      // 실제 API 호출
+      const response = await updateUserInfo(payload);
+
+      if (response.success) {
+        // 성공 시 UI 업데이트
+        setUserInfo(prev => ({
+          ...prev,
+          [field]: field === 'password' ? '********' : tempValue
+        }));
+
+        // 이름 변경 시 헤더 업데이트
+        if (field === 'name') {
+          localStorage.setItem('userName', tempValue);
+          window.dispatchEvent(new Event('userInfoChanged'));
+          window.dispatchEvent(new Event('storage'));
+        }
+
+        setEditingField(null);
+        setTempValue('');
+        alert('정보가 수정되었습니다.');
+      }
+    } catch (error) {
+      console.error('Update failed:', error);
+      alert('정보 수정에 실패했습니다.');
+    }
   };
 
   const handleCancel = () => {
@@ -100,7 +171,7 @@ const Account = () => {
     setTempValue('');
   };
 
-  // localStorage에서 결제수단 불러오기
+  // --- 결제 수단 로직 (로컬 스토리지 유지) ---
   useEffect(() => {
     const stored = localStorage.getItem('paymentMethods');
     if (stored) {
@@ -112,7 +183,6 @@ const Account = () => {
     }
   }, []);
 
-  // 결제수단 변경 시 localStorage에 저장
   useEffect(() => {
     if (paymentMethods.length > 0) {
       localStorage.setItem('paymentMethods', JSON.stringify(paymentMethods));
@@ -187,6 +257,8 @@ const Account = () => {
       setPaymentMethods((prev) => prev.filter((method) => method.id !== cardId));
     }
   };
+
+  if (loading) return <div style={{ padding: '50px', textAlign: 'center' }}>로딩 중...</div>;
 
   return (
     <div className="account-page">
@@ -323,33 +395,14 @@ const Account = () => {
                   </button>
                 )}
               </div>
+
+              {/* 이메일은 보통 수정 불가로 둡니다 (로그인 ID이므로) */}
               <div className="info-item">
                 <div className="info-label">이메일</div>
-                {editingField === 'email' ? (
-                  <input
-                    type="email"
-                    className="info-input"
-                    value={tempValue}
-                    onChange={(e) => setTempValue(e.target.value)}
-                  />
-                ) : (
-                  <div className="info-value">{userInfo.email}</div>
-                )}
-                {editingField === 'email' ? (
-                  <div className="button-group">
-                    <button className="save-btn" onClick={() => handleSave('email')}>
-                      저장
-                    </button>
-                    <button className="cancel-btn" onClick={handleCancel}>
-                      취소
-                    </button>
-                  </div>
-                ) : (
-                  <button className="change-btn" onClick={() => handleEditClick('email')}>
-                    수정
-                  </button>
-                )}
+                <div className="info-value">{userInfo.email}</div>
+                {/* 이메일 수정 버튼 제거 or 필요시 추가 */}
               </div>
+
               <div className="info-item">
                 <div className="info-label">비밀번호</div>
                 {editingField === 'password' ? (
@@ -358,6 +411,7 @@ const Account = () => {
                     className="info-input"
                     value={tempValue}
                     onChange={(e) => setTempValue(e.target.value)}
+                    placeholder="새 비밀번호 입력"
                   />
                 ) : (
                   <div className="info-value">{userInfo.password}</div>
@@ -377,6 +431,7 @@ const Account = () => {
                   </button>
                 )}
               </div>
+
               <div className="info-item">
                 <div className="info-label">전화번호</div>
                 {editingField === 'phone' ? (
@@ -387,7 +442,7 @@ const Account = () => {
                     onChange={(e) => setTempValue(e.target.value)}
                   />
                 ) : (
-                  <div className="info-value">{userInfo.phone}</div>
+                  <div className="info-value">{userInfo.phone || '미등록'}</div>
                 )}
                 {editingField === 'phone' ? (
                   <div className="button-group">
@@ -404,6 +459,7 @@ const Account = () => {
                   </button>
                 )}
               </div>
+
               <div className="info-item">
                 <div className="info-label">주소</div>
                 {editingField === 'address' ? (
@@ -414,7 +470,7 @@ const Account = () => {
                     onChange={(e) => setTempValue(e.target.value)}
                   />
                 ) : (
-                  <div className="info-value">{userInfo.address}</div>
+                  <div className="info-value">{userInfo.address || '미등록'}</div>
                 )}
                 {editingField === 'address' ? (
                   <div className="button-group">
@@ -431,6 +487,7 @@ const Account = () => {
                   </button>
                 )}
               </div>
+
               <div className="info-item">
                 <div className="info-label">생년월일</div>
                 {editingField === 'birthDate' ? (
@@ -441,7 +498,7 @@ const Account = () => {
                     onChange={(e) => setTempValue(e.target.value)}
                   />
                 ) : (
-                  <div className="info-value">{userInfo.birthDate}</div>
+                  <div className="info-value">{userInfo.birthDate || '미등록'}</div>
                 )}
                 {editingField === 'birthDate' ? (
                   <div className="button-group">
@@ -462,6 +519,7 @@ const Account = () => {
           </div>
         )}
 
+        {/* Payment Tab Content */}
         {activeTab === 'payment' && (
           <div className="account-content">
             <section className="account-details">
@@ -512,6 +570,7 @@ const Account = () => {
               </button>
             </div>
             <form className="add-card-form" onSubmit={handleAddCardSubmit}>
+              {/* 카드 입력 폼 내용 (기존 유지) */}
               <label className="modal-field">
                 카드 번호
                 <input
@@ -586,4 +645,3 @@ const Account = () => {
 };
 
 export default Account;
-

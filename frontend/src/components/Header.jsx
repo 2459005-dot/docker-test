@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { logout } from '../api/authApi'; // ✅ 우리가 만든 로그아웃 함수 import
 import {
   FiHeart,
   FiUser,
@@ -15,69 +16,42 @@ const Header = () => {
   const navigate = useNavigate();
   const isSearchPage = location.pathname === '/search';
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  
+  // 초기값 설정
   const [isLoggedIn, setIsLoggedIn] = useState(() => {
     return localStorage.getItem('isLoggedIn') === 'true';
   });
 
   // localStorage에서 사용자 정보 불러오기
   const loadUserName = () => {
-    const stored = localStorage.getItem('userInfo');
-    if (stored) {
-      try {
-        const userInfo = JSON.parse(stored);
-        return userInfo.name || 'Tomhoon';
-      } catch (error) {
-        console.error('Failed to load user info', error);
-      }
-    }
-    return 'Tomhoon';
+    const stored = localStorage.getItem('userInfo'); // Login.jsx 등에서 userInfo 저장 여부 확인 필요
+    // 만약 userInfo 객체로 저장 안했다면 userName, userEmail 각각 가져와야 함.
+    // 일단 안전하게 각각 가져오는 로직으로 수정
+    const name = localStorage.getItem('userName');
+    return name || 'Tomhoon';
   };
 
   const [userName, setUserName] = useState(loadUserName);
   const profileMenuRef = useRef(null);
 
   useEffect(() => {
-    // localStorage 변경 감지
-    const checkLoginStatus = () => {
+    // 상태 업데이트 함수
+    const updateAuthStatus = () => {
       setIsLoggedIn(localStorage.getItem('isLoggedIn') === 'true');
+      const name = localStorage.getItem('userName');
+      setUserName(name || 'Tomhoon');
     };
 
-    // 사용자 정보 변경 감지
-    const checkUserInfo = () => {
-      const stored = localStorage.getItem('userInfo');
-      if (stored) {
-        try {
-          const userInfo = JSON.parse(stored);
-          setUserName(userInfo.name || 'Tomhoon');
-        } catch (error) {
-          console.error('Failed to load user info', error);
-        }
-      }
-    };
+    // 이벤트 리스너 등록
+    window.addEventListener('loginStatusChanged', updateAuthStatus);
+    window.addEventListener('storage', updateAuthStatus);
 
-    // storage 이벤트 리스너 (다른 탭에서 변경 시)
-    const handleStorage = (e) => {
-      if (e.key === 'isLoggedIn') {
-        checkLoginStatus();
-      } else if (e.key === 'userInfo') {
-        checkUserInfo();
-      }
-    };
-
-    // 커스텀 이벤트 리스너 (같은 탭에서의 변경 감지)
-    window.addEventListener('loginStatusChanged', checkLoginStatus);
-    // 사용자 정보 변경 이벤트 리스너
-    window.addEventListener('userInfoChanged', checkUserInfo);
-    // storage 이벤트 리스너
-    window.addEventListener('storage', handleStorage);
-
-    // 초기 로드
-    checkUserInfo();
+    // 초기 실행
+    updateAuthStatus();
 
     return () => {
-      window.removeEventListener('loginStatusChanged', checkLoginStatus);
-      window.removeEventListener('userInfoChanged', checkUserInfo);
-      window.removeEventListener('storage', handleStorage);
+      window.removeEventListener('loginStatusChanged', updateAuthStatus);
+      window.removeEventListener('storage', updateAuthStatus);
     };
   }, []);
 
@@ -94,14 +68,13 @@ const Header = () => {
     setIsDropdownOpen((prev) => !prev);
   };
 
-  const handleLogoutClick = () => {
-    localStorage.removeItem('isLoggedIn');
-    localStorage.removeItem('userEmail');
-    setIsLoggedIn(false);
-    setIsDropdownOpen(false);
-    // 로그인 상태 변경 이벤트 발생
-    window.dispatchEvent(new Event('loginStatusChanged'));
-    navigate('/');
+  // ✅ [수정됨] 로그아웃 로직 교체
+  const handleLogoutClick = async () => {
+    setIsDropdownOpen(false); // 드롭다운 닫기
+    await logout(); // authApi.js의 logout 함수 호출 (백엔드 요청 + 로컬스토리지 청소)
+    // logout 함수 내부에서 window.location.href = '/login' 등을 할 수도 있지만,
+    // 여기서 navigate를 써도 무방함 (authApi.js 구현에 따라 다름)
+    navigate('/login'); 
   };
 
   const handleLoginClick = () => {
@@ -208,4 +181,3 @@ const Header = () => {
 };
 
 export default Header;
-

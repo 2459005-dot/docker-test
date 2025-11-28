@@ -11,6 +11,7 @@ import Login from './pages/Login';
 import SignUp from './pages/SignUp';
 import ForgotPassword from './pages/ForgotPassword';
 import Account from './pages/Account';
+import SocialLoginHandler from './pages/SocialLoginHandler';
 
 function App() {
   return (
@@ -24,6 +25,7 @@ function App() {
         <Route path="/booking-confirmation" element={<BookingConfirmation />} />
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<SignUp />} />
+        <Route path="/oauth/:provider" element={<SocialLoginHandler />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/account" element={<Account />} />
       </Routes>

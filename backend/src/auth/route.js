@@ -13,7 +13,11 @@ router.patch("/me", verifyToken, controller.updateMe);
 // ==========================================
 // 1. 구글 로그인
 // ==========================================
-router.get('/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
+router.get('/google', passport.authenticate('google', {
+    scope: ['profile', 'email'],
+    prompt: 'select_account' // ✅ [추가 추천] 구글 계정 선택 화면 강제
+}));
+
 router.get('/google/callback',
     passport.authenticate('google', { session: false }),
     controller.googleCallback
@@ -22,7 +26,10 @@ router.get('/google/callback',
 // ==========================================
 // 2. 카카오 로그인 (▼▼▼ 여기 추가하세요 ▼▼▼)
 // ==========================================
-router.get('/kakao', passport.authenticate('kakao'));
+router.get('/kakao', passport.authenticate('kakao', { 
+    prompt: 'login' // ✅ 최신 카카오 API 표준: 무조건 ID/PW 입력창 띄우기
+}));
+
 router.get('/kakao/callback',
     passport.authenticate('kakao', { session: false }),
     controller.kakaoCallback
