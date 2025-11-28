@@ -1,0 +1,33 @@
+h1 {
+  font-size: clamp(4.8rem, 4.5vw, 4.8rem);
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+h2 {
+  font-size: clamp(2.8rem, 3.2vw, 2.8rem);
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+h3 {
+  font-size: clamp(2.2rem, 2.6vw, 2.2rem);
+  font-weight: 600;
+}
+
+h4 {
+  font-size: clamp(1.8rem, 2vw, 1.8rem);
+  font-weight: 600;
+}
+
+p {
+  font-size: clamp(1.6rem, 1.4vw, 1.6rem);
+  color: var(--text);
+}
+
+/* 필드별 크기 유틸 */
+.input-title,
+.input-content {
+  font-size: clamp(1.4rem, 1.6vw, 1.5rem);
+}
+

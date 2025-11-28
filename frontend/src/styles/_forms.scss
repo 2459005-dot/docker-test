@@ -1,0 +1,110 @@
+/* =========================
+   Form Elements
+========================= */
+input,
+select,
+textarea {
+  width: 100%;
+  padding: 1rem 1.2rem;
+  border: 0.1rem solid var(--border);
+  border-radius: var(--radius-s);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 1.4rem;
+  transition:
+    border-color 0.16s ease,
+    box-shadow 0.16s ease,
+    background-color 0.2s ease,
+    color 0.2s ease;
+
+  &::placeholder {
+    color: var(--muted);
+  }
+
+  &:disabled {
+    background: var(--surface-alt);
+    color: var(--muted);
+    cursor: not-allowed;
+  }
+}
+
+textarea {
+  min-height: 12rem;
+  resize: vertical;
+}
+
+/* =========================
+   Focus / Hover States
+========================= */
+input:focus,
+select:focus,
+textarea:focus {
+  outline: none;
+  border-color: var(--focus);
+  box-shadow: 0 0 0 0.3rem rgba(91, 159, 255, 0.15);
+  background-color: #fff;
+}
+
+/* hover 효과 (포커스 전의 subtle한 인터랙션) */
+input:hover:not(:disabled),
+select:hover:not(:disabled),
+textarea:hover:not(:disabled) {
+  border-color: #cfd5db;
+}
+
+label {
+  display: block;
+  font-size: 1.35rem;
+  color: var(--muted);
+  margin-bottom: 0.4rem;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  transition: color 0.2s ease;
+  margin: 1rem 0 0;
+}
+
+/* Search Field Styles */
+.search-field {
+  display: flex;
+  flex-direction: column;
+  gap: 1.2rem;
+
+  label {
+    font-size: 1.4rem;
+    font-weight: 600;
+    color: var(--accent);
+  }
+}
+
+.field {
+  display: flex;
+  align-items: center;
+  gap: 1.2rem;
+  padding: 1.6rem;
+  border-radius: var(--radius-m);
+  background: var(--bg);
+  border: 0.1rem solid rgba(36, 64, 56, 0.1);
+  box-shadow: inset 0 0 0 0.1rem rgba(36, 64, 56, 0.04);
+  font-size: 1.4rem;
+  position: relative;
+  min-height: 11rem;
+
+  svg {
+    font-size: 2rem;
+    color: #1e4b3e;
+    flex-shrink: 0;
+  }
+
+  span {
+    color: var(--muted);
+    font-size: 1.4rem;
+  }
+}
+
+.field-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  flex: 1;
+}
+

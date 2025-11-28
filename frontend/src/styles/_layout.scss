@@ -1,0 +1,41 @@
+.container {
+  max-width: 120rem;
+  margin: 0 auto;
+  padding: 0 5%;
+}
+
+.container-sm {
+  min-width: 60rem;
+  padding: 2rem;
+  @media (max-width: 600px) {
+    min-width: auto;
+  }
+}
+
+.section {
+  padding: 2.4rem 0;
+}
+
+section.minvh {
+  min-height: 100vh;
+}
+
+.page {
+  min-height: 100vh;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  gap: 8rem;
+}
+
+.app-container {
+  min-height: 100vh;
+  width: 100%;
+  background: var(--app-bg);
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  gap: 8rem;
+}
+
