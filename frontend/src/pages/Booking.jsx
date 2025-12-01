@@ -1,23 +1,35 @@
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import { FiMapPin, FiCalendar, FiUsers, FiCreditCard, FiPlus } from 'react-icons/fi';
-import { allHotelsData } from './SearchResults';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
+
+// ✅ API Import (경로 정확함)
+import { getLodgingDetail, getRooms } from '../api/lodgingApi';
+import { createBooking } from '../api/bookingApi';
+import { getMe } from '../api/authApi';
+
 import './style/Booking.scss';
 
 const Booking = () => {
-  const { id, roomId } = useParams();
+  const { id, roomId } = useParams(); // URL 파라미터 (숙소ID, 방ID)
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   
   const checkIn = searchParams.get('checkIn');
   const checkOut = searchParams.get('checkOut');
-  const rooms = searchParams.get('rooms') || '1';
-  const guests = searchParams.get('guests') || '2';
+  const roomsCount = parseInt(searchParams.get('rooms') || '1', 10);
+  const guestsCount = parseInt(searchParams.get('guests') || '2', 10);
   
+  // ✅ 백엔드 데이터 State
+  const [hotel, setHotel] = useState(null);
+  const [room, setRoom] = useState(null);
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  // 결제 관련 State
   const [paymentMethods, setPaymentMethods] = useState([]);
   const [selectedCard, setSelectedCard] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
@@ -27,6 +39,7 @@ const Booking = () => {
   const [isSummaryVisible, setIsSummaryVisible] = useState(false);
   const [isAddCardModalOpen, setIsAddCardModalOpen] = useState(false);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  
   const [newCard, setNewCard] = useState({
     cardNumber: '',
     expDate: '',
@@ -35,56 +48,52 @@ const Booking = () => {
     country: '대한민국',
     saveInfo: true,
   });
+  
   const isEditing = !isSummaryVisible;
 
-  const hotel = useMemo(() => {
-    return allHotelsData.find((h) => h.id === parseInt(id));
-  }, [id]);
-
-  // 객실 데이터 (실제로는 roomId로 찾아야 하지만, 여기서는 간단히 처리)
-  const room = useMemo(() => {
-    const rooms = [
-      {
-        id: 1,
-        name: 'Superior Room',
-        description: '1 더블베드 or 2 트윈 베드',
-        price: 240000,
-      },
-      {
-        id: 2,
-        name: 'Deluxe Room',
-        description: '1 king bed with city view',
-        price: 280000,
-      },
-      {
-        id: 3,
-        name: 'Suite',
-        description: '2 bedrooms with living area',
-        price: 350000,
-      },
-      {
-        id: 4,
-        name: 'Executive Suite',
-        description: '3 bedrooms with full kitchen',
-        price: 450000,
-      },
-    ];
-    return rooms.find((r) => r.id === parseInt(roomId)) || rooms[0];
-  }, [roomId]);
-
-  const baseFare = room?.price || 240000;
-  const taxes = 0;
-  const serviceFee = 0;
-  const total = baseFare - discountAmount + taxes + serviceFee;
-
-  const destinationParts = hotel?.destination?.split(',').map((part) => part.trim()) || [];
-  const city = destinationParts[0] || '서울';
-  const country = destinationParts[1] || '대한민국';
-
+  // ✅ 1. 데이터 불러오기 (숙소, 방, 유저 정보 병렬 호출)
   useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        
+        // 3가지 정보를 동시에 가져옵니다.
+        const [hotelRes, roomsRes, userRes] = await Promise.all([
+          getLodgingDetail(id),
+          getRooms(id),
+          getMe() // 로그인한 유저 정보 (이름, 폰번호 자동입력용)
+        ]);
+
+        if (hotelRes.success) setHotel(hotelRes.data);
+        
+        if (roomsRes.success) {
+          // roomId에 해당하는 방 찾기
+          // (주의: DB ID는 _id 이므로 비교)
+          const foundRoom = roomsRes.data.find(r => r._id === roomId);
+          setRoom(foundRoom || roomsRes.data[0]); // 혹시 없으면 첫번째 방
+        }
+
+        // 유저 정보가 있으면 전화번호 미리 채워주기
+        if (userRes && userRes.success) {
+          setUser(userRes.data);
+          if (userRes.data.phoneNumber) {
+            setPhoneNumber(userRes.data.phoneNumber);
+          }
+        }
+
+      } catch (error) {
+        console.error("데이터 로딩 실패:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
     window.scrollTo({ top: 0, behavior: 'smooth' });
-    
-    // localStorage에서 결제수단 불러오기
+  }, [id, roomId]);
+
+  // 로컬 스토리지에서 결제수단 불러오기 (UI용)
+  useEffect(() => {
     const stored = localStorage.getItem('paymentMethods');
     if (stored) {
       try {
@@ -99,14 +108,13 @@ const Booking = () => {
     }
   }, []);
 
-  useEffect(() => {
-    // reset summary if room changes
-    setIsSummaryVisible(false);
-    setCouponCode('');
-    setCouponMessage('');
-    setDiscountAmount(0);
-    setPhoneNumber('');
-  }, [roomId]);
+  // 가격 계산
+  const baseFare = room?.price || 0;
+  const taxes = 0;
+  const serviceFee = 0;
+  const total = baseFare - discountAmount + taxes + serviceFee;
+
+  // 쿠폰 로직
   const handleApplyCoupon = () => {
     const trimmedCode = couponCode.trim();
     if (!trimmedCode) {
@@ -116,9 +124,7 @@ const Booking = () => {
     }
 
     const upperCode = trimmedCode.toUpperCase();
-    const isKoreanDiscount = trimmedCode === '할인';
-
-    if (upperCode === 'WELCOME10' || isKoreanDiscount) {
+    if (upperCode === 'WELCOME10') {
       const newDiscount = Math.floor(baseFare * 0.1);
       setDiscountAmount(newDiscount);
       setCouponMessage('10% 할인 쿠폰이 적용되었습니다.');
@@ -128,7 +134,7 @@ const Booking = () => {
     }
   };
 
-
+  // 날짜 포맷 함수
   const formatDate = (dateString) => {
     if (!dateString) return '날짜 선택';
     const date = new Date(dateString);
@@ -141,6 +147,7 @@ const Booking = () => {
     return format(date, "MMM d (EEE)", { locale: ko });
   };
 
+  // 카드 관련 핸들러들
   const formatCardNumber = (value) => {
     const digits = value.replace(/\D/g, '').slice(0, 16);
     return digits.replace(/(\d{4})(?=\d)/g, '$1 ').trim();
@@ -148,26 +155,16 @@ const Booking = () => {
 
   const formatExpDateValue = (value) => {
     const digits = value.replace(/\D/g, '').slice(0, 4);
-    if (digits.length <= 2) {
-      return digits;
-    }
-    const month = digits.slice(0, 2);
-    const year = digits.slice(2);
-    return `${month}/${year}`;
+    if (digits.length <= 2) return digits;
+    return `${digits.slice(0, 2)}/${digits.slice(2)}`;
   };
 
   const handleNewCardChange = (field, value) => {
     setNewCard((prev) => {
       let nextValue = value;
-      if (field === 'cardNumber') {
-        nextValue = formatCardNumber(value);
-      } else if (field === 'expDate') {
-        nextValue = formatExpDateValue(value);
-      }
-      return {
-        ...prev,
-        [field]: nextValue,
-      };
+      if (field === 'cardNumber') nextValue = formatCardNumber(value);
+      else if (field === 'expDate') nextValue = formatExpDateValue(value);
+      return { ...prev, [field]: nextValue };
     });
   };
 
@@ -179,7 +176,7 @@ const Booking = () => {
   const handleAddCardSubmit = (event) => {
     event.preventDefault();
     if (!newCard.cardNumber.trim() || !newCard.cardName.trim() || !newCard.expDate.trim() || !newCard.cvc.trim()) {
-      setCouponMessage('카드 정보를 모두 입력해주세요.');
+      alert('카드 정보를 모두 입력해주세요.');
       return;
     }
 
@@ -200,83 +197,80 @@ const Booking = () => {
     const updatedMethods = [...paymentMethods, newMethod];
     setPaymentMethods(updatedMethods);
     setSelectedCard(newId);
-    // localStorage에 저장
     localStorage.setItem('paymentMethods', JSON.stringify(updatedMethods));
     setIsAddCardModalOpen(false);
-    setNewCard({
-      cardNumber: '',
-      expDate: '',
-      cvc: '',
-      cardName: '',
-      country: '대한민국',
-      saveInfo: true,
-    });
+    setNewCard({ cardNumber: '', expDate: '', cvc: '', cardName: '', country: '대한민국', saveInfo: true });
   };
 
   const handleDeleteCard = (cardId, e) => {
     e.stopPropagation();
     const updatedMethods = paymentMethods.filter((method) => method.id !== cardId);
     setPaymentMethods(updatedMethods);
-    // localStorage에 저장
     localStorage.setItem('paymentMethods', JSON.stringify(updatedMethods));
     if (selectedCard === cardId) {
-      if (updatedMethods.length > 0) {
-        setSelectedCard(updatedMethods[0].id);
-      } else {
-        setSelectedCard('');
-      }
+      setSelectedCard(updatedMethods.length > 0 ? updatedMethods[0].id : '');
     }
   };
 
-  const buildBookingPayload = useCallback(() => {
-    const bookingNumber = Date.now().toString().slice(-8);
-    return {
-      hotelName: hotel?.name || '해튼호텔',
-      roomName: room ? `${room.name} - ${room.description}` : '객실 정보',
-      address: hotel?.address || '서울특별시 중구 을지로 12',
-      city,
-      country,
-      image: hotel?.image || '',
-      checkInDateLabel: formatTicketDate(checkIn),
-      checkOutDateLabel: formatTicketDate(checkOut),
-      checkInTime: '12:00pm',
-      checkOutTime: '11:30pm',
-      arrivalInfo: '결제 완료',
-      guestName: 'James Doe',
-      guestCount: guests,
-      bookingNumber,
-      barcode: '|| ||| | |||| |||',
-      totalPrice: total,
-      bookingId: `${id || '1'}-${roomId || '1'}`,
-      createdAt: new Date().toISOString(),
-    };
-  }, [hotel?.name, hotel?.address, room, city, country, checkIn, checkOut, guests, roomId, total, id]);
-
-  const handleConfirmPayment = () => {
-    const payload = buildBookingPayload();
-
+  // ✅ 결제 확정 및 예약 생성 (백엔드 전송)
+  const handleConfirmPayment = async () => {
     try {
-      const stored = JSON.parse(localStorage.getItem('bookingHistory') || '[]');
-      const filtered = stored.filter((item) => item.bookingNumber !== payload.bookingNumber);
-      const updated = [payload, ...filtered].slice(0, 10);
-      localStorage.setItem('bookingHistory', JSON.stringify(updated));
-    } catch (error) {
-      console.error('Failed to store booking history', error);
-    }
+      // 1. 백엔드로 보낼 데이터 구성
+      const bookingData = {
+        lodgingId: hotel._id,
+        roomId: room._id,
+        checkIn,
+        checkOut,
+        price: total,
+        userName: user?.name || 'Guest', // 로그인 유저 이름 (없으면 Guest)
+        userPhone: phoneNumber,
+        paymentKey: selectedCard || 'temp_payment_key', // 실제 PG 연동 시엔 결제키 필요
+        paymentAmount: total
+      };
 
-    setIsPaymentModalOpen(false);
-    navigate('/booking-confirmation', { state: payload });
+      console.log("🚀 예약 요청 데이터:", bookingData);
+
+      // 2. API 호출
+      const response = await createBooking(bookingData);
+
+      if (response && (response.success || response.resultCode === 201)) {
+        // 3. 예약 성공 후 완료 페이지로 이동
+        // 완료 페이지에 보여줄 정보를 state로 넘겨줍니다.
+        const payload = {
+          bookingNumber: response.data._id, // DB 예약 ID 사용
+          hotelName: hotel.lodgingName,
+          roomName: room.roomName,
+          checkInDateLabel: formatTicketDate(checkIn),
+          checkOutDateLabel: formatTicketDate(checkOut),
+          totalPrice: total,
+          guestName: user?.name || 'Guest',
+          image: (hotel.images && hotel.images.length > 0) ? hotel.images[0] : '',
+          address: hotel.address
+        };
+        
+        setIsPaymentModalOpen(false);
+        navigate('/booking-confirmation', { state: payload });
+      } else {
+        alert(response.message || "예약에 실패했습니다.");
+      }
+
+    } catch (error) {
+      console.error("예약 생성 에러:", error);
+      // 에러 메시지 추출
+      const errorMsg = error.response?.data?.message || error.message || "예약 중 오류가 발생했습니다.";
+      alert(errorMsg);
+    }
   };
 
-  if (!hotel) {
+  // 로딩 및 에러 처리
+  if (loading) return <div style={{padding: '100px', textAlign: 'center'}}>로딩 중...</div>;
+  if (!hotel || !room) {
     return (
       <div className="booking-page">
         <Header />
         <div className="not-found">
-          <p>호텔을 찾을 수 없습니다.</p>
-          <button onClick={() => navigate('/search')} className="btn primary">
-            검색 결과로 돌아가기
-          </button>
+          <p>예약 정보를 불러올 수 없습니다.</p>
+          <button onClick={() => navigate(-1)} className="btn primary">뒤로 가기</button>
         </div>
         <Footer />
       </div>
@@ -291,31 +285,20 @@ const Booking = () => {
         <div className="booking-main">
           {/* Breadcrumbs */}
           <div className="breadcrumbs">
-            {(() => {
-              const parts = hotel.destination.split(',').map(s => s.trim());
-              const city = parts[0];
-              const country = parts[1] || '';
-              return (
-                <>
-                  {country && <span>{country}</span>}
-                  {country && <span className="separator">&gt;</span>}
-                  <span>{city}</span>
-                  <span className="separator">&gt;</span>
-                  <span>{hotel.name}</span>
-                </>
-              );
-            })()}
+            <span>{hotel.country}</span>
+            <span className="separator">&gt;</span>
+            <span>{hotel.lodgingName}</span>
           </div>
 
           {/* Room Title */}
           <div className="room-title-section">
-            <h1 className="room-title">{room?.name} - {room?.description}</h1>
+            <h1 className="room-title">{room.roomName}</h1>
             <span className="room-price-header">₩{baseFare.toLocaleString()}/night</span>
           </div>
 
           {/* Hotel Info Card */}
           <div className="hotel-info-card">
-            <h2 className="card-title">{hotel.name}</h2>
+            <h2 className="card-title">{hotel.lodgingName}</h2>
             <p className="hotel-address">
               <FiMapPin /> {hotel.address}
             </p>
@@ -366,7 +349,7 @@ const Booking = () => {
                     type="button"
                     className="method-delete"
                     onClick={(e) => handleDeleteCard(method.id, e)}
-                    disabled={!isEditing || method.id === 'card1'}
+                    disabled={!isEditing}
                   >
                     삭제
                   </button>
@@ -389,7 +372,7 @@ const Booking = () => {
               <input
                 type="text"
                 className="coupon-input"
-                placeholder="쿠폰 코드를 입력하세요"
+                placeholder="WELCOME10 입력 시 10% 할인"
                 value={couponCode}
                 onChange={(e) => setCouponCode(e.target.value)}
                 disabled={!isEditing}
@@ -426,12 +409,13 @@ const Booking = () => {
             </label>
             <p className="contact-info-helper">입력하신 번호로 예약 확인 문자가 전송됩니다.</p>
           </div>
+          
           <div className="next-button-container">
             {isEditing ? (
               <button
                 className="btn primary next-button"
                 onClick={() => setIsSummaryVisible(true)}
-                disabled={phoneNumber.length !== 11}
+                disabled={phoneNumber.length < 10}
               >
                 다음 단계
               </button>
@@ -449,21 +433,20 @@ const Booking = () => {
         {/* Booking Summary */}
         <div className={`booking-summary ${isSummaryVisible ? 'active' : 'inactive'}`}>
           <div className="summary-image">
-            <img src={hotel.image} alt={hotel.name} />
+            {/* 이미지가 없으면 빈 문자열 또는 기본 이미지 */}
+            <img 
+              src={(hotel.images && hotel.images.length > 0) ? hotel.images[0] : 'https://images.unsplash.com/photo-1566073771259-6a8506099945'} 
+              alt={hotel.lodgingName} 
+            />
           </div>
           <div className="summary-content">
             <h2 className="summary-title">예약정보 요약</h2>
-            <h3 className="summary-hotel-name">{hotel.name}</h3>
-            <p className="summary-room-name">{room?.name} - {room?.description}</p>
-            <div className="summary-rating">
-              <span className="rating-score">{hotel.reviewScore}</span>
-              <span className="rating-text">{hotel.reviewText}</span>
-              <span className="rating-count">54개 리뷰</span>
-            </div>
-            <p className="protection-text">해당 예약은 golobe에서 안전하게 보호됩니다.</p>
+            <h3 className="summary-hotel-name">{hotel.lodgingName}</h3>
+            <p className="summary-room-name">{room.roomName}</p>
+            
             <div className="summary-guest-info">
               <FiUsers />
-              <span>객실 {rooms}개 · 투숙객 {guests}명</span>
+              <span>객실 {roomsCount}개 · 투숙객 {guestsCount}명</span>
             </div>
             
             <div className="price-breakdown">
@@ -475,18 +458,6 @@ const Booking = () => {
                 <span>할인</span>
                 <span>-₩{discountAmount.toLocaleString()}</span>
               </div>
-              {taxes > 0 && (
-                <div className="price-row">
-                  <span>세금</span>
-                  <span>₩{taxes.toLocaleString()}</span>
-                </div>
-              )}
-              {serviceFee > 0 && (
-                <div className="price-row">
-                  <span>서비스 수수료</span>
-                  <span>₩{serviceFee.toLocaleString()}</span>
-                </div>
-              )}
               <div className="price-row total">
                 <span>총 금액</span>
                 <span>₩{total.toLocaleString()}</span>
@@ -497,7 +468,6 @@ const Booking = () => {
                 className="btn primary pay-button"
                 disabled={isEditing}
                 onClick={() => setIsPaymentModalOpen(true)}
-                data-state={isEditing ? 'disabled' : 'enabled'}
               >
                 결제하기
               </button>
@@ -508,6 +478,7 @@ const Booking = () => {
 
       <Footer />
 
+      {/* Payment Confirmation Modal */}
       {isPaymentModalOpen && (
         <div className="modal-overlay" onClick={() => setIsPaymentModalOpen(false)}>
           <div className="confirm-modal" onClick={(e) => e.stopPropagation()}>
@@ -528,84 +499,23 @@ const Booking = () => {
         </div>
       )}
 
+      {/* Card Modal (UI 유지) */}
       {isAddCardModalOpen && (
         <div className="modal-overlay" onClick={() => setIsAddCardModalOpen(false)}>
           <div className="add-card-modal" onClick={(e) => e.stopPropagation()}>
-            <button className="modal-close" onClick={() => setIsAddCardModalOpen(false)} aria-label="닫기">
-              ×
-            </button>
+            <button className="modal-close" onClick={() => setIsAddCardModalOpen(false)}>×</button>
             <h2 className="add-card-title">카드 추가</h2>
             <form className="add-card-form" onSubmit={handleAddCardSubmit}>
-              <label className="modal-field">
-                카드 번호
-                <input
-                  type="text"
-                  value={newCard.cardNumber}
-                  onChange={(e) => handleNewCardChange('cardNumber', e.target.value)}
-                  placeholder="4321 4321 4321 4321"
-                  required
-                />
-              </label>
-              <div className="modal-field inline">
-                <label>
-                  만료일 (MM/YY)
-                  <input
-                    type="text"
-                    value={newCard.expDate}
-                    onChange={(e) => handleNewCardChange('expDate', e.target.value)}
-                    placeholder="02/27"
-                    required
-                  />
-                </label>
-                <label>
-                  CVC
-                  <input
-                    type="text"
-                    value={newCard.cvc}
-                    onChange={(e) => handleNewCardChange('cvc', e.target.value)}
-                    placeholder="123"
-                    required
-                  />
-                </label>
-              </div>
-              <label className="modal-field">
-                카드 명의자
-                <input
-                  type="text"
-                  value={newCard.cardName}
-                  onChange={(e) => handleNewCardChange('cardName', e.target.value)}
-                  placeholder="홍길동"
-                  required
-                />
-              </label>
-              <label className="modal-field">
-                국가 또는 지역
-                <select
-                  value={newCard.country}
-                  onChange={(e) => handleNewCardChange('country', e.target.value)}
-                >
-                  <option value="대한민국">대한민국</option>
-                  <option value="미국">미국</option>
-                  <option value="일본">일본</option>
-                  <option value="영국">영국</option>
-                </select>
-              </label>
-              <label className="save-info-checkbox">
-                <input
-                  type="checkbox"
-                  checked={newCard.saveInfo}
-                  onChange={(e) => handleNewCardChange('saveInfo', e.target.checked)}
-                />
-                정보 저장하기
-              </label>
-              <div className="modal-actions">
-                <button type="button" className="btn secondary" onClick={() => setIsAddCardModalOpen(false)}>
-                  취소
-                </button>
-                <button type="submit" className="btn primary">
-                  카드 추가
-                </button>
-              </div>
+               <label className="modal-field">카드 번호<input type="text" value={newCard.cardNumber} onChange={(e) => handleNewCardChange('cardNumber', e.target.value)} required /></label>
+               <div className="modal-field inline">
+                 <label>만료일<input type="text" value={newCard.expDate} onChange={(e) => handleNewCardChange('expDate', e.target.value)} required /></label>
+                 <label>CVC<input type="text" value={newCard.cvc} onChange={(e) => handleNewCardChange('cvc', e.target.value)} required /></label>
+               </div>
+               <label className="modal-field">카드 명의자<input type="text" value={newCard.cardName} onChange={(e) => handleNewCardChange('cardName', e.target.value)} required /></label>
+               <div className="modal-actions">
+                 <button type="button" className="btn secondary" onClick={() => setIsAddCardModalOpen(false)}>취소</button>
+                 <button type="submit" className="btn primary">카드 추가</button>
+               </div>
             </form>
           </div>
         </div>

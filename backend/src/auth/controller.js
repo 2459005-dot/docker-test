@@ -76,3 +76,14 @@ exports.kakaoCallback = (req, res) => {
         res.status(500).json(errorResponse("카카오 로그인 실패", 500));
     }
 };
+
+exports.resetPassword = async (req, res) => {
+    try {
+        const { email, name } = req.body;
+        const tempPassword = await authService.resetPasswordService(email, name);
+        
+        res.status(200).json(successResponse({ tempPassword }, "임시 비밀번호가 발급되었습니다."));
+    } catch (err) {
+        res.status(err.status || 500).json(errorResponse(err.message, err.status || 500));
+    }
+};

@@ -10,73 +10,96 @@ import {
 } from 'react-icons/fi';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
+import { getMyBookings } from '../api/bookingApi'; // ✅ API import
 import './style/BookingConfirmation.scss';
-
-const defaultBooking = {
-  hotelName: '해튼호텔',
-  roomName: 'Superior room - 1 double bed or 2 twin beds',
-  address: 'Gümüssuyu Mah. İnönü Cad. No:8, Istanbul 34437',
-  city: 'Istanbul',
-  country: 'Turkey',
-  image: 'https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=1200&q=80',
-  checkInDateLabel: 'Dec 8 (Thu)',
-  checkOutDateLabel: 'Dec 9 (Fri)',
-  checkInTime: '12:00pm',
-  checkOutTime: '11:30pm',
-  arrivalInfo: '결제 완료',
-  guestName: 'James Doe',
-  guestCount: 2,
-  bookingNumber: '20250123',
-  barcode: '|| ||| | |||| |||',
-  totalPrice: 240000,
-  guestEmail: 'james.doe@email.com',
-  guestPhone: '+82 10-2345-6789',
-  specialRequests: '늦은 체크아웃 요청',
-  paymentMethod: 'Visa •••• 9421',
-  paymentStatus: '결제 완료',
-  roomCharge: 320000,
-  serviceFee: 15000,
-  taxes: 15000,
-  hotelPhone: '+82 2-987-6543',
-  hotelEmail: 'contact@hatonhotel.com',
-  supportHours: '연중무휴 24시간',
-};
-
-const getStoredHistory = () => {
-  try {
-    return JSON.parse(localStorage.getItem('bookingHistory')) || [];
-  } catch (error) {
-    console.error('Failed to read booking history', error);
-    return [];
-  }
-};
 
 const BookingConfirmation = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const [booking, setBooking] = useState(location.state || defaultBooking);
+  
+  // 방금 예약한 정보 (Booking.jsx에서 넘어옴)
+  const [booking, setBooking] = useState(location.state || null);
+  
+  // DB에서 가져온 내 예약 내역
   const [bookingHistory, setBookingHistory] = useState([]);
-  const [isHistoryOpen, setIsHistoryOpen] = useState(true);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false); // 기본값은 닫힘으로 변경
+  const [loading, setLoading] = useState(true);
 
+  // 금액 포맷 함수
   const formatCurrency = (value) => {
     if (value === undefined || value === null) return '-';
     return `₩${Number(value).toLocaleString()}`;
   };
 
-  useEffect(() => {
-    const storedHistory = getStoredHistory();
-    if (location.state) {
-      setBooking(location.state);
-    } else if (storedHistory.length) {
-      setBooking(storedHistory[0]);
+  // 날짜 포맷 함수 (ISO String -> 보기 좋은 날짜)
+  const formatHistoryDate = (isoString) => {
+    if (!isoString) return '-';
+    try {
+      return new Date(isoString).toLocaleString('ko-KR', {
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+    } catch (error) {
+      return '-';
     }
-    setBookingHistory(storedHistory);
+  };
+
+  // ✅ 1. 내 예약 목록 불러오기 (DB 연동)
+  useEffect(() => {
+    const fetchMyBookings = async () => {
+      try {
+        setLoading(true);
+        const response = await getMyBookings();
+        
+        if (response.success && response.data.length > 0) {
+          // 백엔드 데이터를 프론트 UI에 맞게 변환 (매핑)
+          const mappedHistory = response.data.map(item => ({
+            bookingNumber: item._id, // 예약 ID
+            hotelName: item.lodgingId?.lodgingName || '숙소 정보 없음',
+            roomName: item.roomId?.roomName || '객실 정보 없음',
+            address: item.lodgingId?.address || '',
+            city: item.lodgingId?.country || '', // 도시 정보가 없으면 국가로 대체
+            country: item.lodgingId?.country || '대한민국',
+            image: (item.lodgingId?.images && item.lodgingId.images.length > 0) ? item.lodgingId.images[0] : '',
+            
+            checkInDateLabel: item.checkIn ? new Date(item.checkIn).toLocaleDateString() : '-',
+            checkOutDateLabel: item.checkOut ? new Date(item.checkOut).toLocaleDateString() : '-',
+            checkInTime: '15:00', // DB에 시간이 없으면 기본값
+            checkOutTime: '11:00',
+            
+            arrivalInfo: item.status === 'confirmed' ? '예약 확정' : '결제 대기',
+            guestName: item.userName || 'Guest',
+            guestCount: 2, // 인원 정보 없으면 기본값
+            
+            barcode: '|| ||| | |||| |||',
+            totalPrice: item.price,
+            paymentMethod: '카드 결제',
+            createdAt: item.createdAt
+          }));
+
+          setBookingHistory(mappedHistory);
+
+          // 만약 방금 넘어온 state가 없다면, 가장 최근 예약을 보여줌
+          if (!location.state && mappedHistory.length > 0) {
+            setBooking(mappedHistory[0]);
+          }
+        }
+      } catch (error) {
+        console.error("예약 내역 로딩 실패:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchMyBookings();
   }, [location.state]);
 
   const breadcrumbItems = [
-    booking.country || '대한민국',
-    booking.city || '서울',
-    booking.hotelName || '해튼호텔',
+    booking?.country || '대한민국',
+    booking?.city || '서울',
+    booking?.hotelName || '숙소',
   ];
 
   const handleDownload = () => {
@@ -92,19 +115,22 @@ const BookingConfirmation = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const formatHistoryDate = (isoString) => {
-    if (!isoString) return '-';
-    try {
-      return new Date(isoString).toLocaleString('ko-KR', {
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-      });
-    } catch (error) {
-      return '-';
-    }
-  };
+  // 로딩 중이거나 예약 정보가 아예 없을 때
+  if (loading && !booking) return <div style={{padding: '100px', textAlign: 'center'}}>로딩 중...</div>;
+  if (!booking && !loading) {
+    return (
+        <div className="booking-confirmation-page">
+            <Header />
+            <div className="booking-confirmation-container">
+                <div className="not-found" style={{textAlign: 'center', padding: '100px 0'}}>
+                    <h2>예약된 내역이 없습니다.</h2>
+                    <button className="btn primary" onClick={() => navigate('/')} style={{marginTop: '20px'}}>홈으로 가기</button>
+                </div>
+            </div>
+            <Footer />
+        </div>
+    );
+  }
 
   return (
     <div className="booking-confirmation-page">
@@ -112,19 +138,20 @@ const BookingConfirmation = () => {
       <div className="booking-confirmation-container">
         <div className="breadcrumbs">
           {breadcrumbItems.map((item, index) => (
-            <React.Fragment key={item}>
+            <React.Fragment key={index}>
               <span>{item}</span>
               {index < breadcrumbItems.length - 1 && <span className="separator">&gt;</span>}
             </React.Fragment>
           ))}
         </div>
 
+        {/* 예약 내역 리스트 (토글) */}
         {bookingHistory.length > 0 && (
           <section className="booking-history-section">
             <div className="section-header">
               <div className="section-copy">
                 <h2>예약 내역</h2>
-                <p>최신 예약부터 최대 10건까지 확인할 수 있습니다.</p>
+                <p>최근 예약 내역을 확인할 수 있습니다.</p>
               </div>
               <button
                 type="button"
@@ -141,7 +168,7 @@ const BookingConfirmation = () => {
                   const isActive = item.bookingNumber === booking.bookingNumber;
                   return (
                     <article
-                      key={`${item.bookingNumber}_${item.createdAt}`}
+                      key={item.bookingNumber}
                       className={`history-card ${isActive ? 'active' : ''}`}
                     >
                       <div className="history-main">
@@ -174,7 +201,7 @@ const BookingConfirmation = () => {
             </p>
           </div>
           <div className="header-actions">
-            <span className="price">₩{(booking.totalPrice || 0).toLocaleString()}/night</span>
+            <span className="price">{formatCurrency(booking.totalPrice)}</span>
             <div className="action-buttons">
               <button className="icon-button" aria-label="공유하기">
                 <FiShare2 />
@@ -203,7 +230,7 @@ const BookingConfirmation = () => {
 
             <div className="ticket-body">
               <div className="guest-info">
-                <div className="avatar">{booking.guestName?.[0] || 'J'}</div>
+                <div className="avatar">{booking.guestName?.[0] || 'G'}</div>
                 <div className="guest-details">
                   <span className="guest-name">{booking.guestName}</span>
                   <span className="room-name">{booking.roomName}</span>
@@ -211,15 +238,15 @@ const BookingConfirmation = () => {
                 <div className="stay-meta">
                   <div>
                     <span className="label">체크인 시간</span>
-                    <strong>{booking.checkInTime}</strong>
+                    <strong>{booking.checkInTime || '15:00'}</strong>
                   </div>
                   <div>
                     <span className="label">체크아웃 시간</span>
-                    <strong>{booking.checkOutTime}</strong>
+                    <strong>{booking.checkOutTime || '11:00'}</strong>
                   </div>
                   <div>
                     <span className="label">결제 상태</span>
-                    <strong>{booking.arrivalInfo}</strong>
+                    <strong>{booking.arrivalInfo || '예약 확정'}</strong>
                   </div>
                 </div>
               </div>
@@ -227,63 +254,9 @@ const BookingConfirmation = () => {
               <div className="ticket-footer">
                 <div className="ticket-code">
                   <span className="label">예약 코드</span>
-                  <strong>{booking.bookingNumber}</strong>
+                  <strong>{booking.bookingNumber?.slice(-8).toUpperCase()}</strong>
                 </div>
-                <div className="barcode">{booking.barcode}</div>
-              </div>
-
-              <div className="ticket-extra">
-                <article className="info-card compact">
-                  <div className="info-card-header">
-                    <h2>게스트 정보</h2>
-                    <span>{`${parseInt(booking.guestCount, 10) || 1}명`}</span>
-                  </div>
-                  <dl>
-                    <div>
-                      <dt>대표 투숙객</dt>
-                      <dd>{booking.guestName}</dd>
-                    </div>
-                    <div>
-                      <dt>이메일</dt>
-                      <dd>{booking.guestEmail || '등록되지 않음'}</dd>
-                    </div>
-                    <div>
-                      <dt>연락처</dt>
-                      <dd>{booking.guestPhone || '-'}</dd>
-                    </div>
-                    <div>
-                      <dt>특별 요청</dt>
-                      <dd>{booking.specialRequests || '없음'}</dd>
-                    </div>
-                  </dl>
-                </article>
-
-                <article className="info-card compact">
-                  <div className="info-card-header">
-                    <h2>연락처 / 헬프라인</h2>
-                    <span>24/7</span>
-                  </div>
-                  <dl>
-                    <div>
-                      <dt>호텔 대표번호</dt>
-                      <dd>{booking.hotelPhone || '-'}</dd>
-                    </div>
-                    <div>
-                      <dt>이메일</dt>
-                      <dd>{booking.hotelEmail || 'info@example.com'}</dd>
-                    </div>
-                    <div>
-                      <dt>운영 시간</dt>
-                      <dd>{booking.supportHours || '연중무휴'}</dd>
-                    </div>
-                    <div>
-                      <dt>긴급 지원</dt>
-                      <dd>
-                        고객센터 앱 채팅 또는 <a href="mailto:help@golobe.com">help@golobe.com</a>
-                      </dd>
-                    </div>
-                  </dl>
-                </article>
+                <div className="barcode">{booking.barcode || '|| ||| | |||| |||'}</div>
               </div>
             </div>
           </div>
@@ -308,12 +281,12 @@ const BookingConfirmation = () => {
               <div>
                 <FiClock />
                 <span>
-                  {booking.checkInTime} · {booking.checkOutTime}
+                  {booking.checkInTime || '15:00'} · {booking.checkOutTime || '11:00'}
                 </span>
               </div>
               <div>
                 <FiUsers />
-                <span>최대 {parseInt(booking.guestCount, 10) || 2}명</span>
+                <span>최대 {parseInt(booking.guestCount || 2, 10)}명</span>
               </div>
             </div>
           </div>
@@ -323,28 +296,16 @@ const BookingConfirmation = () => {
           <article className="info-card">
             <div className="info-card-header">
               <h2>결제 상세</h2>
-              <span>{booking.paymentStatus || booking.arrivalInfo}</span>
+              <span>{booking.arrivalInfo || '결제 완료'}</span>
             </div>
             <dl>
               <div>
-                <dt>객실 요금</dt>
-                <dd>{formatCurrency(booking.roomCharge || booking.totalPrice)}</dd>
-              </div>
-              <div>
-                <dt>서비스 & 수수료</dt>
-                <dd>{formatCurrency(booking.serviceFee)}</dd>
-              </div>
-              <div>
-                <dt>세금</dt>
-                <dd>{formatCurrency(booking.taxes)}</dd>
-              </div>
-              <div className="total">
                 <dt>총 결제 금액</dt>
                 <dd>{formatCurrency(booking.totalPrice)}</dd>
               </div>
               <div>
                 <dt>결제 수단</dt>
-                <dd>{booking.paymentMethod || '현장 결제'}</dd>
+                <dd>{booking.paymentMethod || '카드 결제'}</dd>
               </div>
             </dl>
           </article>
@@ -357,7 +318,6 @@ const BookingConfirmation = () => {
               <h3>결제 안내</h3>
               <ul>
                 <li>결제 정보가 정확하지 않은 경우 예약이 취소될 수 있습니다.</li>
-                <li>결제 과정에서 이상 거래가 감지되면 추가 인증을 요청드릴 수 있습니다.</li>
                 <li>체크인 시 사용한 카드와 신분증을 지참해 주세요.</li>
               </ul>
             </div>
@@ -365,17 +325,9 @@ const BookingConfirmation = () => {
               <h3>취소 및 변경</h3>
               <ul>
                 <li>호텔 정책에 따라 취소 수수료가 발생할 수 있습니다.</li>
-                <li>객실 변경은 고객센터를 통해 요청 가능합니다.</li>
                 <li>추가 문의는 help@golobe.com 으로 연락 주세요.</li>
               </ul>
             </div>
-          </div>
-          <div className="contact-card">
-            <h3>문의하기</h3>
-            <p>Golobe Group Q.S.C, Doha, State of Qatar</p>
-            <p>
-              이메일: <a href="mailto:help@golobe.com">help@golobe.com</a>
-            </p>
           </div>
         </section>
 
@@ -389,4 +341,3 @@ const BookingConfirmation = () => {
 };
 
 export default BookingConfirmation;
-

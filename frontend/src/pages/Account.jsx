@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { FiUpload, FiEdit2, FiX, FiUser, FiCreditCard, FiPlus, FiTrash2 } from 'react-icons/fi';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
-import { getMe, updateUserInfo } from '../api/authApi'; // ✅ API 함수 import
+import { getMe, updateUserInfo } from '../api/authApi'; // ✅ API 함수 불러오기
 import './style/Account.scss';
 
 const defaultCoverImages = [
@@ -32,58 +32,44 @@ const defaultProfileOptions = [
 const Account = () => {
   const [activeTab, setActiveTab] = useState('account');
 
-  // ✅ 사용자 정보 State (초기값은 비워둠)
+  // ✅ 사용자 정보 State (초기값은 비워둡니다)
   const [userInfo, setUserInfo] = useState({
     name: '',
     email: '',
-    password: '********', // 보안상 마스킹
+    password: '********', // 비밀번호는 보안상 마스킹 처리
     phone: '',
     address: '',
     birthDate: '',
   });
 
-  const [loading, setLoading] = useState(true); // 로딩 상태
+  const [loading, setLoading] = useState(true); // 로딩 상태 추가
 
-  // ✅ 1. 백엔드에서 내 정보 불러오기 (useEffect)
+  // ✅ 1. 페이지 접속 시 DB에서 내 정보 가져오기
   useEffect(() => {
     const fetchUserData = async () => {
       try {
-        console.log("🚀 내 정보 불러오기 시작...");
-        
-        // API 호출
-        const response = await getMe();
-        console.log("👉 서버 응답:", response);
-
-        // 성공 여부 체크 (response가 있고, success가 true일 때)
-        if (response && (response.success || response.resultCode === 200)) {
+        const response = await getMe(); // API 호출
+        if (response.success) {
           const user = response.data;
-          
+
           setUserInfo({
             name: user.name || '',
             email: user.email || '',
-            password: '********', 
-            // 백엔드 phoneNumber -> 프론트 phone 매핑
-            phone: user.phoneNumber || '', 
+            password: '********', // 실제 비번은 안 보여줌
+            phone: user.phoneNumber || '', // 백엔드(phoneNumber) -> 프론트(phone)
             address: user.address || '',
+            // 날짜 포맷 변환 (YYYY-MM-DDThh:mm... -> YYYY-MM-DD)
             birthDate: user.birthDate ? user.birthDate.split('T')[0] : '',
           });
 
-          // 로컬스토리지 동기화
-          if (user.name) localStorage.setItem('userName', user.name);
-          if (user.email) localStorage.setItem('userEmail', user.email);
-          
-        } else {
-          console.warn("❌ 데이터를 가져왔지만 실패 응답임:", response);
-          // 실패했다면 로그인 페이지로 튕기게 할 수도 있음 (선택사항)
+          // 헤더 등 다른 곳 업데이트를 위해 로컬스토리지 동기화
+          localStorage.setItem('userName', user.name);
+          window.dispatchEvent(new Event('userInfoChanged'));
         }
-
       } catch (error) {
-        console.error('❌ 내 정보 불러오기 실패 (에러):', error);
-        // 토큰이 만료되었거나 없을 때 여기서 에러가 날 수 있음
+        console.error('Failed to load user info:', error);
       } finally {
-        // 🚨 [핵심] 성공하든 실패하든 로딩은 무조건 끈다!
         setLoading(false);
-        console.log("🏁 로딩 종료");
       }
     };
 
@@ -99,7 +85,7 @@ const Account = () => {
   const [showCoverModal, setShowCoverModal] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
 
-  // 결제 수단 (로컬 스토리지 사용 유지)
+  // 결제 수단 (이건 일단 로컬 스토리지 유지 - 백엔드 연결 안 함)
   const [paymentMethods, setPaymentMethods] = useState([]);
   const [isAddCardModalOpen, setIsAddCardModalOpen] = useState(false);
   const [newCard, setNewCard] = useState({
@@ -122,21 +108,10 @@ const Account = () => {
     }
   };
 
-  // ✅ 3. 저장 버튼 클릭 시 (백엔드 전송)
+  // ✅ 3. 저장 버튼 클릭 시 (백엔드로 전송)
   const handleSave = async (field) => {
     try {
-      // 보낼 데이터 준비
-      const updateData = {};
-
-      if (field === 'name') updateData.displayName = tempValue; // 백엔드가 displayName 또는 name을 받음 (authApi에서 처리됨)
-      if (field === 'phone') updateData.phone = tempValue;
-      if (field === 'address') updateData.address = tempValue;
-      if (field === 'birthDate') updateData.birthDate = tempValue;
-      if (field === 'password') updateData.password = tempValue; // 비밀번호 변경
-
-      // 이름은 특별히 처리 (authApi나 백엔드 로직에 맞춤)
-      // 여기서는 UI의 field명과 백엔드 필드명을 맞추기 위해 
-      // api 호출 시 객체 키를 동적으로 할당
+      // API에 보낼 데이터 준비
       const payload = { [field]: tempValue };
 
       // 실제 API 호출
@@ -149,7 +124,7 @@ const Account = () => {
           [field]: field === 'password' ? '********' : tempValue
         }));
 
-        // 이름 변경 시 헤더 업데이트
+        // 이름 변경 시 헤더 업데이트 이벤트 발생
         if (field === 'name') {
           localStorage.setItem('userName', tempValue);
           window.dispatchEvent(new Event('userInfoChanged'));
@@ -258,6 +233,7 @@ const Account = () => {
     }
   };
 
+  // 로딩 중 화면
   if (loading) return <div style={{ padding: '50px', textAlign: 'center' }}>로딩 중...</div>;
 
   return (

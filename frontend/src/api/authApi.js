@@ -72,14 +72,16 @@ export const logout = async () => {
   }
 };
 
-// 내 정보 수정
+// ✅ [추가] 내 정보 수정 API
 export const updateUserInfo = async (data) => {
+  // 프론트엔드 필드명(phone)을 백엔드 필드명(phoneNumber)으로 변환
   const payload = { ...data };
   if (payload.phone) {
     payload.phoneNumber = payload.phone;
     delete payload.phone;
   }
 
+  // PATCH /api/auth/me 요청 (controller.updateMe 실행됨)
   const { data: responseData } = await api.patch('/auth/me', payload);
   return responseData;
 };

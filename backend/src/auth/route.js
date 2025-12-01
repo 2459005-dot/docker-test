@@ -35,4 +35,7 @@ router.get('/kakao/callback',
     controller.kakaoCallback
 );
 
+// 비밀번호 찾기 (초기화)
+router.post("/forgot-password", controller.resetPassword);
+
 module.exports = router;
