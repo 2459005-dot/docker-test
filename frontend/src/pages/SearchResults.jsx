@@ -153,7 +153,7 @@ const SearchResults = () => {
       <Header />
       <SearchHeader />
       
-      <div className="results-container">
+      <div className="search-results-container">
         <aside className="filters-sidebar">
           <SearchFilters filters={filters} onFilterChange={handleFilterChange} />
         </aside>

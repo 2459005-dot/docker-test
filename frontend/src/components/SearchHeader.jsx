@@ -22,7 +22,7 @@ const destinationOptions = [
 const SearchHeader = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  
+
   // URL 쿼리 파라미터에서 검색 값 읽기
   const destinationParam = searchParams.get('destination') || '서울, 대한민국';
   const checkInParam = searchParams.get('checkIn');
@@ -34,8 +34,8 @@ const SearchHeader = () => {
   const [destinationQuery, setDestinationQuery] = useState(destinationParam);
   const [isDestinationOpen, setDestinationOpen] = useState(false);
   const [dateRange, setDateRange] = useState(() => {
-    const from = checkInParam ? parseISO(checkInParam) : new Date('2025-12-02');
-    const to = checkOutParam ? parseISO(checkOutParam) : addDays(from, 2);
+    const from = checkInParam ? parseISO(checkInParam) : undefined;
+    const to = checkOutParam ? parseISO(checkOutParam) : undefined;
     return { from, to };
   });
   const [isCalendarOpen, setCalendarOpen] = useState(false);
@@ -102,8 +102,28 @@ const SearchHeader = () => {
   const formattedCheckIn = formatDateLabel(checkIn, '날짜 선택');
   const formattedCheckOut = formatDateLabel(checkOut, '날짜 선택');
 
-  const handleCalendarChange = (range) => {
+  // ✅ [수정] 날짜 선택 핸들러
+  const handleCalendarChange = (range, selectedDay) => {
+
+    // 1. [핵심] '체크인' 입력창이 활성화된 상태라면?
+    // 라이브러리가 계산한 range는 무시하고, 클릭한 날짜를 무조건 '새로운 시작일'로 설정
+    if (activeDateInput === 'from' && selectedDay) {
+      setDateRange({ from: selectedDay, to: undefined }); // 끝 날짜 초기화
+      setActiveDateInput('to'); // 바로 체크아웃 선택 모드로 전환
+      return;
+    }
+
+    // 2. '체크아웃' 입력창이 활성화된 상태라면?
+    // 기존 로직대로 range를 따라가되, 날짜 순서가 꼬이면 라이브러리가 알아서 뒤집어준 걸 씁니다.
     setDateRange(range || { from: undefined, to: undefined });
+
+    // 3. 둘 다 선택되면 닫기 (0.2초 딜레이)
+    if (range?.from && range?.to) {
+      setTimeout(() => {
+        setCalendarOpen(false);
+        setActiveDateInput(null);
+      }, 200);
+    }
   };
 
   const handleCalendarOpen = (event) => {
@@ -113,7 +133,9 @@ const SearchHeader = () => {
     setGuestOpen(false);
   };
 
+  // ✅ [수정] '완료' 버튼은 유지하되, 필요성은 줄어듦 (수동 닫기 용도)
   const handleApplyDates = () => {
+    // 만약 체크인만 찍고 닫으려 할 때, 체크아웃을 다음날로 자동 설정
     if (checkIn && !checkOut) {
       setDateRange({ from: checkIn, to: addDays(checkIn, 1) });
     }
@@ -137,20 +159,20 @@ const SearchHeader = () => {
     // URL 쿼리 파라미터 업데이트
     // destinationQuery가 최신 값이므로 우선 사용, 없으면 destination 사용
     const finalDestination = (destinationQuery?.trim()) || (destination?.trim());
-    
+
     if (!finalDestination) {
       alert('목적지를 선택해주세요.');
       return;
     }
-    
+
     const params = new URLSearchParams();
     params.set('destination', finalDestination);
-    
+
     if (checkIn) params.set('checkIn', format(checkIn, 'yyyy-MM-dd'));
     if (checkOut) params.set('checkOut', format(checkOut, 'yyyy-MM-dd'));
     params.set('rooms', guestOption.rooms.toString());
     params.set('guests', guestOption.guests.toString());
-    
+
     setSearchParams(params);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -177,7 +199,7 @@ const SearchHeader = () => {
       setDestination(dest);
       setDestinationQuery(dest);
     }
-    
+
     // 날짜 업데이트
     if (checkInParam && checkOutParam) {
       const from = parseISO(checkInParam);
@@ -189,7 +211,7 @@ const SearchHeader = () => {
         setDateRange({ from, to });
       }
     }
-    
+
     // 객실 수 업데이트
     if (rooms) {
       const roomsNum = parseInt(rooms);
@@ -197,7 +219,7 @@ const SearchHeader = () => {
         setGuestOption((prev) => ({ ...prev, rooms: roomsNum }));
       }
     }
-    
+
     // 투숙객 수 업데이트
     if (guests) {
       const guestsNum = parseInt(guests);
