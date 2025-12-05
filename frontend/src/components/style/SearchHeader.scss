@@ -6,9 +6,67 @@
   margin-top: 0;
   border-bottom: 0.1rem solid var(--border);
   box-shadow: var(--shadow-soft);
+  max-width: 180rem;
+  margin: 0 auto;
+  width: 100%;
+  box-sizing: border-box;
+  
+  // 레이아웃 잡기
+  display: grid;
+  grid-template-columns: 32rem 2.4rem 1fr;
+  gap: 0;
+  align-items: start;
 
+  // ✅ [핵심] 기존 SearchCard 스타일을 '헤더용'으로 덮어쓰기 (Override)
   .search-card {
-    max-width: 140rem;
-    margin: 0 auto;
+    grid-column: 1 / -1;
+    width: auto !important;      // 고정 너비 해제
+    max-width: none !important;  // 최대 너비 해제
+    margin: 0 !important;        // 중앙 정렬 마진 해제
+    
+    // 패딩 및 박스 스타일 재정의
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    box-sizing: border-box !important;
+    
+    // 배경 및 그림자 제거 (wrapper가 대신 함)
+    background: transparent !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+
+    .search-field {
+      gap: 1.6rem;
+
+      label {
+        font-size: 1.4rem;
+        display: none; // 헤더에서는 라벨('어디에 머무르시나요?') 숨김 처리 추천 (선택사항)
+      }
+    }
+
+    // 내부 필드 크기 조절 (헤더에 맞게 조금 작게)
+    .field {
+      min-height: 7.2rem;
+      padding: 1.4rem 1.6rem;
+
+      svg {
+        font-size: 1.8rem;
+      }
+
+      span {
+        font-size: 1.3rem;
+      }
+    }
+
+    .destination-input,
+    .date-toggle,
+    .guest-button {
+      font-size: 1.4rem;
+    }
+
+    @media (max-width: 1024px) {
+      padding: 1.4rem 2rem !important;
+    }
   }
 }

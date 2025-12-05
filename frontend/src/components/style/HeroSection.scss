@@ -13,30 +13,81 @@
     width: 100%;
     min-height: 52rem;
     border-radius: 3.2rem;
-    overflow: visible;
+    overflow: hidden; // ✅ 슬라이더 이미지가 둥근 모서리를 넘지 않게 처리
     box-shadow: 0 2.4rem 5rem rgba(31, 59, 46, 0.18);
     box-sizing: border-box;
   }
 
+  // ✅ [최신 코드 적용] 이미지 슬라이더 스타일
   .hero-background {
     position: absolute;
     inset: 0;
     border-radius: 3.2rem;
-    background-image: linear-gradient(120deg, rgba(14, 34, 27, 0.65), rgba(18, 54, 44, 0.35)),
-      url('https://images.unsplash.com/photo-1501117716987-c8e1ecb210ab?auto=format&fit=crop&w=1600&q=80');
-    background-size: cover;
-    background-position: center;
+    overflow: hidden;
+
+    img {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      opacity: 0; // 기본적으로 숨김
+      transform: scale(1.02);
+      transition: opacity 0.8s ease-in-out, transform 8s ease-out;
+
+      // 현재 활성화된 슬라이드만 보임
+      &.active {
+        opacity: 1;
+        transform: scale(1.05); // 줌인 효과
+      }
+    }
+
+    .hero-overlay {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(120deg,
+          rgba(14, 34, 27, 0.7),
+          rgba(18, 54, 44, 0.4));
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    // 슬라이더 점 (인디케이터)
+    .hero-indicators {
+      position: absolute;
+      right: 3.2rem;
+      bottom: 2.4rem;
+      display: flex;
+      gap: 0.8rem;
+      z-index: 2;
+
+      .indicator {
+        width: 0.9rem;
+        height: 0.9rem;
+        border-radius: 50%;
+        border: none;
+        padding: 0;
+        background: rgba(255, 255, 255, 0.45);
+        cursor: pointer;
+        transition: background 0.2s ease, transform 0.2s ease;
+
+        &.active {
+          background: #ffffff;
+          transform: scale(1.4);
+        }
+      }
+    }
   }
 
   .hero-content {
     position: relative;
-    z-index: 1;
+    z-index: 2;
     height: 100%;
     display: flex;
     flex-direction: column;
     justify-content: center;
     gap: 2.4rem;
-    padding: 0 7.2rem;
+    padding: 0 5%;
     color: #ffffff;
 
     .badge {
@@ -65,6 +116,19 @@
       max-width: 42rem;
       color: #d9ede4;
       margin: 0;
+    }
+
+    // 검색창 위치 조정
+    .search-card {
+      width: calc(100% + 4%) !important;
+      max-width: calc(100% + 4%) !important;
+      margin-left: -2% !important;
+      margin-right: -2% !important;
+      padding-left: 2% !important;
+      padding-right: 2% !important;
+      padding-top: 2.4rem !important;
+      padding-bottom: 2.4rem !important;
+      box-sizing: border-box !important;
     }
   }
 }

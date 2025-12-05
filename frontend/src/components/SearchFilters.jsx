@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import './style/SearchFilters.scss';
 
 const SearchFilters = ({ onFilterChange }) => {
+  // 상태 관리
   const [priceRange, setPriceRange] = useState([50000, 1200000]);
   const [selectedRating, setSelectedRating] = useState(null);
   const [freebies, setFreebies] = useState({
@@ -18,7 +19,7 @@ const SearchFilters = ({ onFilterChange }) => {
     pool: false,
   });
 
-  // 필터 변경 시 부모 컴포넌트에 알림
+  // ✅ [최적화] 필터 변경 감지 (여기서만 부모에게 알림을 보냅니다)
   useEffect(() => {
     if (onFilterChange) {
       onFilterChange({
@@ -31,89 +32,41 @@ const SearchFilters = ({ onFilterChange }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [priceRange, selectedRating, freebies, amenities]);
 
+  // 핸들러 함수들 (중복 호출 제거됨)
   const handleFreebieChange = (key) => {
-    setFreebies((prev) => {
-      const updated = {
-        ...prev,
-        [key]: !prev[key],
-      };
-      // 즉시 부모 컴포넌트에 알림
-      if (onFilterChange) {
-        onFilterChange({
-          priceRange,
-          selectedRating,
-          freebies: updated,
-          amenities,
-        });
-      }
-      return updated;
-    });
+    setFreebies((prev) => ({
+      ...prev,
+      [key]: !prev[key],
+    }));
   };
 
   const handleAmenityChange = (key) => {
-    setAmenities((prev) => {
-      const updated = {
-        ...prev,
-        [key]: !prev[key],
-      };
-      // 즉시 부모 컴포넌트에 알림
-      if (onFilterChange) {
-        onFilterChange({
-          priceRange,
-          selectedRating,
-          freebies,
-          amenities: updated,
-        });
-      }
-      return updated;
-    });
+    setAmenities((prev) => ({
+      ...prev,
+      [key]: !prev[key],
+    }));
   };
 
   const handleRatingChange = (rating) => {
-    const newRating = selectedRating === rating ? null : rating;
-    setSelectedRating(newRating);
-    // 즉시 부모 컴포넌트에 알림
-    if (onFilterChange) {
-      onFilterChange({
-        priceRange,
-        selectedRating: newRating,
-        freebies,
-        amenities,
-      });
-    }
+    setSelectedRating(selectedRating === rating ? null : rating);
   };
 
   const handleResetAll = () => {
-    const resetPriceRange = [50000, 1200000];
-    const resetRating = null;
-    const resetFreebies = {
+    setPriceRange([50000, 1200000]);
+    setSelectedRating(null);
+    setFreebies({
       breakfast: false,
       parking: false,
       wifi: false,
       shuttle: false,
       cancellation: false,
-    };
-    const resetAmenities = {
+    });
+    setAmenities({
       frontDesk: false,
       aircon: false,
       fitness: false,
       pool: false,
-    };
-
-    setPriceRange(resetPriceRange);
-    setSelectedRating(resetRating);
-    setFreebies(resetFreebies);
-    setAmenities(resetAmenities);
-
-    // 즉시 부모 컴포넌트에 알림
-    if (onFilterChange) {
-      onFilterChange({
-        priceRange: resetPriceRange,
-        selectedRating: resetRating,
-        freebies: resetFreebies,
-        amenities: resetAmenities,
-      });
-    }
+    });
   };
 
   return (
@@ -125,6 +78,7 @@ const SearchFilters = ({ onFilterChange }) => {
         </button>
       </div>
 
+      {/* 가격 필터 */}
       <div className="filter-section">
         <h4 className="filter-label">가격</h4>
         <div className="price-range">
@@ -141,16 +95,10 @@ const SearchFilters = ({ onFilterChange }) => {
               step="10000"
               value={priceRange[1]}
               onChange={(e) => {
-                const newPriceRange = [priceRange[0], parseInt(e.target.value)];
-                setPriceRange(newPriceRange);
-                // 즉시 부모 컴포넌트에 알림
-                if (onFilterChange) {
-                  onFilterChange({
-                    priceRange: newPriceRange,
-                    selectedRating,
-                    freebies,
-                    amenities,
-                  });
+                const newMax = parseInt(e.target.value, 10);
+                // 최소값보다 작아지지 않게 방어 코드 추가
+                if (newMax >= priceRange[0]) {
+                    setPriceRange([priceRange[0], newMax]);
                 }
               }}
               className="price-slider"
@@ -159,6 +107,7 @@ const SearchFilters = ({ onFilterChange }) => {
         </div>
       </div>
 
+      {/* 별점 필터 */}
       <div className="filter-section">
         <h4 className="filter-label">별점</h4>
         <div className="rating-buttons">
@@ -174,6 +123,7 @@ const SearchFilters = ({ onFilterChange }) => {
         </div>
       </div>
 
+      {/* 무료 서비스 체크박스 */}
       <div className="filter-section">
         <h4 className="filter-label">무료 서비스</h4>
         <div className="checkbox-list">
@@ -220,6 +170,7 @@ const SearchFilters = ({ onFilterChange }) => {
         </div>
       </div>
 
+      {/* 편의시설 체크박스 */}
       <div className="filter-section">
         <h4 className="filter-label">편의시설</h4>
         <div className="checkbox-list">
@@ -262,4 +213,3 @@ const SearchFilters = ({ onFilterChange }) => {
 };
 
 export default SearchFilters;
-

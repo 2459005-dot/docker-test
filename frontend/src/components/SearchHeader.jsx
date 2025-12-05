@@ -23,7 +23,7 @@ const SearchHeader = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  // URL 쿼리 파라미터에서 검색 값 읽기
+  // URL 쿼리 파라미터에서 초기값 읽기
   const destinationParam = searchParams.get('destination') || '';
   const checkInParam = searchParams.get('checkIn');
   const checkOutParam = searchParams.get('checkOut');
@@ -33,12 +33,18 @@ const SearchHeader = () => {
   const [destination, setDestination] = useState(destinationParam);
   const [destinationQuery, setDestinationQuery] = useState(destinationParam);
   const [isDestinationOpen, setDestinationOpen] = useState(false);
+
+  // 날짜 초기값 설정
   const [dateRange, setDateRange] = useState(() => {
     const from = checkInParam ? parseISO(checkInParam) : undefined;
     const to = checkOutParam ? parseISO(checkOutParam) : undefined;
     return { from, to };
   });
+
   const [isCalendarOpen, setCalendarOpen] = useState(false);
+  // ✅ [내 코드의 장점] 체크인/체크아웃 입력창 구분 ('from' | 'to' | null)
+  const [activeDateInput, setActiveDateInput] = useState(null);
+
   const [guestOption, setGuestOption] = useState({
     rooms: parseInt(roomsParam),
     guests: parseInt(guestsParam),
@@ -79,6 +85,7 @@ const SearchHeader = () => {
 
       if (isCalendarOpen && !isInsideCalendar) {
         setCalendarOpen(false);
+        setActiveDateInput(null);
       }
 
       if (guestRef.current && !guestRef.current.contains(event.target)) {
@@ -90,6 +97,7 @@ const SearchHeader = () => {
     return () => document.removeEventListener('click', handleClickOutside);
   }, [isCalendarOpen]);
 
+  // 체크아웃 날짜 역전 방지
   useEffect(() => {
     if (checkIn && checkOut && checkOut <= checkIn) {
       setDateRange({ from: checkIn, to: addDays(checkIn, 1) });
@@ -102,22 +110,19 @@ const SearchHeader = () => {
   const formattedCheckIn = formatDateLabel(checkIn, '날짜 선택');
   const formattedCheckOut = formatDateLabel(checkOut, '날짜 선택');
 
-  // ✅ [수정] 날짜 선택 핸들러
+  // ✅ [내 코드의 장점] 날짜 선택 핸들러
   const handleCalendarChange = (range, selectedDay) => {
-
-    // 1. [핵심] '체크인' 입력창이 활성화된 상태라면?
-    // 라이브러리가 계산한 range는 무시하고, 클릭한 날짜를 무조건 '새로운 시작일'로 설정
+    // 체크인 입력창이 활성화된 상태라면? -> 무조건 시작일로 설정하고 체크아웃으로 전환
     if (activeDateInput === 'from' && selectedDay) {
-      setDateRange({ from: selectedDay, to: undefined }); // 끝 날짜 초기화
-      setActiveDateInput('to'); // 바로 체크아웃 선택 모드로 전환
+      setDateRange({ from: selectedDay, to: undefined });
+      setActiveDateInput('to');
       return;
     }
 
-    // 2. '체크아웃' 입력창이 활성화된 상태라면?
-    // 기존 로직대로 range를 따라가되, 날짜 순서가 꼬이면 라이브러리가 알아서 뒤집어준 걸 씁니다.
+    // 체크아웃 입력창이거나 일반적인 경우
     setDateRange(range || { from: undefined, to: undefined });
 
-    // 3. 둘 다 선택되면 닫기 (0.2초 딜레이)
+    // 둘 다 선택되면 닫기
     if (range?.from && range?.to) {
       setTimeout(() => {
         setCalendarOpen(false);
@@ -126,39 +131,48 @@ const SearchHeader = () => {
     }
   };
 
-  const handleCalendarOpen = (event) => {
+  const handleOpenCheckIn = (event) => {
     event.stopPropagation();
     setCalendarOpen(true);
+    setActiveDateInput('from');
     setDestinationOpen(false);
     setGuestOpen(false);
   };
 
-  // ✅ [수정] '완료' 버튼은 유지하되, 필요성은 줄어듦 (수동 닫기 용도)
+  const handleOpenCheckOut = (event) => {
+    event.stopPropagation();
+    if (!checkIn) {
+      setCalendarOpen(true);
+      setActiveDateInput('from');
+      setDestinationOpen(false);
+      setGuestOpen(false);
+      return;
+    }
+    setCalendarOpen(true);
+    setActiveDateInput('to');
+    setDestinationOpen(false);
+    setGuestOpen(false);
+  };
+
   const handleApplyDates = () => {
-    // 만약 체크인만 찍고 닫으려 할 때, 체크아웃을 다음날로 자동 설정
     if (checkIn && !checkOut) {
       setDateRange({ from: checkIn, to: addDays(checkIn, 1) });
     }
     setCalendarOpen(false);
-  };
-
-  const handleApplyGuests = () => {
-    setGuestOpen(false);
-    // URL 쿼리 파라미터 업데이트
-    const params = new URLSearchParams(searchParams);
-    params.set('rooms', guestOption.rooms.toString());
-    params.set('guests', guestOption.guests.toString());
-    setSearchParams(params);
+    setActiveDateInput(null);
   };
 
   const handleResetDates = () => {
     setDateRange({ from: undefined, to: undefined });
+    setActiveDateInput('from');
+  };
+
+  const handleApplyGuests = () => {
+    setGuestOpen(false);
   };
 
   const handleSearch = () => {
-    // URL 쿼리 파라미터 업데이트
-    // destinationQuery가 최신 값이므로 우선 사용, 없으면 destination 사용
-    const finalDestination = (destinationQuery?.trim()) || (destination?.trim());
+    const finalDestination = destinationQuery?.trim() || destination?.trim();
 
     if (!finalDestination) {
       alert('목적지를 선택해주세요.');
@@ -173,12 +187,12 @@ const SearchHeader = () => {
     params.set('rooms', guestOption.rooms.toString());
     params.set('guests', guestOption.guests.toString());
 
-    setSearchParams(params);
+    // navigate를 사용하여 검색 페이지로 이동 (같은 페이지라면 쿼리만 변경됨)
+    navigate(`/search?${params.toString()}`);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // URL 쿼리 파라미터가 변경될 때 상태 업데이트 (초기 로드 및 쿼리 변경 시)
-  // useMemo로 파라미터 값들을 메모이제이션하여 무한 루프 방지
+  // URL 파라미터 변경 감지 및 동기화 (내 코드의 로직 유지)
   const urlParams = useMemo(() => ({
     destination: searchParams.get('destination'),
     checkIn: searchParams.get('checkIn'),
@@ -194,17 +208,14 @@ const SearchHeader = () => {
     const rooms = urlParams.rooms;
     const guests = urlParams.guests;
 
-    // destination이 URL에 있고 현재 상태와 다를 때만 업데이트
     if (dest && dest !== destination) {
       setDestination(dest);
       setDestinationQuery(dest);
     }
 
-    // 날짜 업데이트
     if (checkInParam && checkOutParam) {
       const from = parseISO(checkInParam);
       const to = parseISO(checkOutParam);
-      // 날짜가 실제로 변경되었을 때만 업데이트
       const currentCheckIn = dateRange.from ? format(dateRange.from, 'yyyy-MM-dd') : null;
       const currentCheckOut = dateRange.to ? format(dateRange.to, 'yyyy-MM-dd') : null;
       if (currentCheckIn !== checkInParam || currentCheckOut !== checkOutParam) {
@@ -212,7 +223,6 @@ const SearchHeader = () => {
       }
     }
 
-    // 객실 수 업데이트
     if (rooms) {
       const roomsNum = parseInt(rooms);
       if (roomsNum !== guestOption.rooms) {
@@ -220,7 +230,6 @@ const SearchHeader = () => {
       }
     }
 
-    // 투숙객 수 업데이트
     if (guests) {
       const guestsNum = parseInt(guests);
       if (guestsNum !== guestOption.guests) {
@@ -236,6 +245,8 @@ const SearchHeader = () => {
         <div className="search-field">
           <label>어디에 머무르시나요?</label>
           <div className="search-row">
+            
+            {/* 목적지 필드 */}
             <div className="field" ref={destinationRef}>
               <FiMapPin />
               <div className="field-content">
@@ -248,10 +259,8 @@ const SearchHeader = () => {
                     placeholder="도시 또는 호텔명을 입력하세요"
                     onFocus={() => setDestinationOpen(true)}
                     onChange={(event) => {
-                      const value = event.target.value;
-                      setDestinationQuery(value);
+                      setDestinationQuery(event.target.value);
                       setDestinationOpen(true);
-                      // 입력 중일 때는 destination을 업데이트하지 않음 (드롭다운에서 선택할 때만 업데이트)
                     }}
                     onClick={(event) => event.stopPropagation()}
                   />
@@ -272,38 +281,7 @@ const SearchHeader = () => {
                 </div>
               </div>
               {isDestinationOpen && (
-                <div
-                  className="destination-dropdown"
-                  onMouseDown={(event) => event.stopPropagation()}
-                >
-                  <div className="destination-search-wrapper">
-                    <input
-                      className="destination-search"
-                      ref={destinationSearchRef}
-                      type="text"
-                      placeholder="도시 검색"
-                      value={destinationQuery}
-                      onChange={(event) => setDestinationQuery(event.target.value)}
-                      onClick={(event) => event.stopPropagation()}
-                    />
-                    {destinationQuery && (
-                      <button
-                        className="clear-search-button"
-                        type="button"
-                        onMouseDown={(event) => {
-                          event.preventDefault();
-                          event.stopPropagation();
-                          setDestination('');
-                          setDestinationQuery('');
-                          requestAnimationFrame(() => {
-                            destinationSearchRef.current?.focus();
-                          });
-                        }}
-                      >
-                        <FiX />
-                      </button>
-                    )}
-                  </div>
+                <div className="destination-dropdown" onMouseDown={(e) => e.stopPropagation()}>
                   <div className="destination-list">
                     {filteredDestinations.length > 0 ? (
                       filteredDestinations.map((item) => (
@@ -315,8 +293,6 @@ const SearchHeader = () => {
                             setDestination(item);
                             setDestinationQuery(item);
                             setDestinationOpen(false);
-                            // 도시 선택 시 즉시 검색 (선택사항)
-                            // 또는 검색 버튼을 눌러야 검색되도록 유지
                           }}
                         >
                           {item}
@@ -329,28 +305,37 @@ const SearchHeader = () => {
                 </div>
               )}
             </div>
+
+            {/* 날짜 필드 */}
             <div className="date-range-wrapper" ref={checkInFieldRef}>
               <div className="date-range-container">
-                <div className="field">
+                <div 
+                  className={`field ${activeDateInput === 'from' ? 'active-input' : ''}`}
+                  onClick={handleOpenCheckIn}
+                >
                   <FiCalendar />
                   <div className="field-content">
                     <span>체크인</span>
-                    <button className="date-toggle" type="button" onClick={handleCalendarOpen}>
+                    <button className="date-toggle" type="button">
                       {formattedCheckIn}
                     </button>
                   </div>
                 </div>
-                <div className="field" ref={checkOutFieldRef}>
+                <div 
+                  className={`field ${activeDateInput === 'to' ? 'active-input' : ''}`}
+                  ref={checkOutFieldRef}
+                  onClick={handleOpenCheckOut}
+                >
                   <FiCalendar />
                   <div className="field-content">
                     <span>체크아웃</span>
-                    <button className="date-toggle" type="button" onClick={handleCalendarOpen}>
+                    <button className="date-toggle" type="button">
                       {formattedCheckOut}
                     </button>
                   </div>
                 </div>
               </div>
-              {isCalendarOpen ? (
+              {isCalendarOpen && (
                 <div
                   className="calendar-dropdown"
                   ref={calendarRef}
@@ -366,16 +351,14 @@ const SearchHeader = () => {
                     className="rdp"
                   />
                   <div className="calendar-actions">
-                    <button className="btn reset" type="button" onClick={handleResetDates}>
-                      초기화
-                    </button>
-                    <button className="btn primary apply" type="button" onClick={handleApplyDates}>
-                      완료
-                    </button>
+                    <button className="btn reset" type="button" onClick={handleResetDates}>초기화</button>
+                    <button className="btn primary apply" type="button" onClick={handleApplyDates}>완료</button>
                   </div>
                 </div>
-              ) : null}
+              )}
             </div>
+
+            {/* 인원 필드 */}
             <div className="field" ref={guestRef}>
               <FiUsers />
               <div className="field-content">
@@ -383,96 +366,40 @@ const SearchHeader = () => {
                 <button
                   className="guest-button"
                   type="button"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    setGuestOpen((prev) => !prev);
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setGuestOpen(!isGuestOpen);
                     setDestinationOpen(false);
                     setCalendarOpen(false);
-                  }}
-                  onMouseDown={(event) => {
-                    event.preventDefault();
-                    event.stopPropagation();
                   }}
                 >
                   객실 {guestOption.rooms}개, 투숙객 {guestOption.guests}명
                 </button>
               </div>
-              {isGuestOpen ? (
-                <div
-                  className="guest-dropdown"
-                  onClick={(event) => event.stopPropagation()}
-                >
+              {isGuestOpen && (
+                <div className="guest-dropdown" onClick={(e) => e.stopPropagation()}>
                   <div className="guest-row">
                     <span className="guest-label">객실</span>
                     <div className="counter-controls">
-                      <button
-                        className="counter-button"
-                        type="button"
-                        onClick={() =>
-                          setGuestOption((prev) => ({
-                            ...prev,
-                            rooms: Math.max(1, prev.rooms - 1),
-                          }))
-                        }
-                      >
-                        -
-                      </button>
+                      <button type="button" onClick={() => setGuestOption(p => ({ ...p, rooms: Math.max(1, p.rooms - 1) }))}>-</button>
                       <span>{guestOption.rooms}</span>
-                      <button
-                        className="counter-button"
-                        type="button"
-                        onClick={() =>
-                          setGuestOption((prev) => ({
-                            ...prev,
-                            rooms: prev.rooms + 1,
-                          }))
-                        }
-                      >
-                        +
-                      </button>
+                      <button type="button" onClick={() => setGuestOption(p => ({ ...p, rooms: p.rooms + 1 }))}>+</button>
                     </div>
                   </div>
                   <div className="guest-row">
                     <span className="guest-label">투숙객</span>
                     <div className="counter-controls">
-                      <button
-                        className="counter-button"
-                        type="button"
-                        onClick={() =>
-                          setGuestOption((prev) => ({
-                            ...prev,
-                            guests: Math.max(1, prev.guests - 1),
-                          }))
-                        }
-                      >
-                        -
-                      </button>
+                      <button type="button" onClick={() => setGuestOption(p => ({ ...p, guests: Math.max(1, p.guests - 1) }))}>-</button>
                       <span>{guestOption.guests}</span>
-                      <button
-                        className="counter-button"
-                        type="button"
-                        onClick={() =>
-                          setGuestOption((prev) => ({
-                            ...prev,
-                            guests: prev.guests + 1,
-                          }))
-                        }
-                      >
-                        +
-                      </button>
+                      <button type="button" onClick={() => setGuestOption(p => ({ ...p, guests: p.guests + 1 }))}>+</button>
                     </div>
                   </div>
-                  <button className="btn primary apply" type="button" onClick={handleApplyGuests}>
-                    완료
-                  </button>
+                  <button className="btn primary apply" type="button" onClick={handleApplyGuests}>완료</button>
                 </div>
-              ) : null}
+              )}
             </div>
-            <button
-              className="btn primary search-button"
-              type="button"
-              onClick={handleSearch}
-            >
+
+            <button className="btn primary search-button" type="button" onClick={handleSearch}>
               검색
             </button>
           </div>
@@ -483,4 +410,3 @@ const SearchHeader = () => {
 };
 
 export default SearchHeader;
-

@@ -20,18 +20,62 @@
   .logo-link {
     display: flex;
     align-items: center;
-    gap: 1.2rem;
+    gap: 1.4rem;
     text-decoration: none;
     color: inherit;
   }
 
-  .logo {
-    font-size: 2.4rem;
-    font-weight: 700;
-    color: #1e3e35;
-    margin: 0;
+  // ✅ [중요] Header.jsx에 새로 적용한 로고 마크 스타일
+  .logo-mark {
+    width: 3.6rem;
+    height: 3.6rem;
+    border-radius: 1.4rem;
+    background: linear-gradient(135deg, #166d5b, #20a286);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+
+    &__initial {
+      font-size: 1.8rem;
+      font-weight: 800;
+      color: #f5faf8;
+      letter-spacing: 0.04em;
+    }
+
+    &__dot {
+      position: absolute;
+      right: 0.5rem;
+      bottom: 0.5rem;
+      width: 0.6rem;
+      height: 0.6rem;
+      border-radius: 999px;
+      background: #f6d38f;
+    }
   }
 
+  .logo-text {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+  }
+
+  .logo {
+    font-size: 2.4rem;
+    font-weight: 800;
+    color: #1e3e35;
+    margin: 0;
+    letter-spacing: 0.02em;
+  }
+
+  .logo-tagline {
+    font-size: 1.2rem;
+    color: #6b8176;
+    font-weight: 500;
+  }
+
+  // 기존 레거시 스타일 (호환성 유지용)
   .logo-subtitle {
     display: flex;
     align-items: center;

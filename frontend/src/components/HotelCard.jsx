@@ -1,27 +1,41 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FiHeart } from 'react-icons/fi';
-// ✅ API 불러오기
-import { addFavorite, removeFavorite, getFavorites } from '../api/favoriteApi';
+// ✅ API 및 로직 유지
+import { addFavorite, removeFavorite } from '../api/favoriteApi';
 import './style/HotelCard.scss';
 
 const HotelCard = ({ hotel }) => {
   const navigate = useNavigate();
+  
+  // ✅ State 병합: 찜 기능 + 이미지 로딩 UI 상태
   const [isFavorited, setIsFavorited] = useState(false);
+  const [imageError, setImageError] = useState(false);
+  const [imageLoading, setImageLoading] = useState(true);
 
-  // 1. 찜 상태 확인 (API + 로컬스토리지 병행 확인)
+  // 1. 찜 상태 초기화 (내 코드 로직 유지)
   useEffect(() => {
-    // 일단 로컬 스토리지로 빠르게 UI 반영 (깜빡임 방지)
     const localFavorites = JSON.parse(localStorage.getItem('favorites') || '[]');
     if (localFavorites.includes(hotel.id)) {
       setIsFavorited(true);
     }
-
-    // (선택사항) 로그인 상태라면 진짜 찜 목록 가져와서 확인
-    // const checkServer = async () => { ... } 
   }, [hotel.id]);
 
-  // 2. 하트 클릭 핸들러 (API 호출)
+  // ✅ 2. 이미지 처리 로직 (최신 코드 적용)
+  const defaultImage = 'https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=800&q=80';
+  // 이미지가 없거나 에러가 났으면 defaultImage 사용
+  const imageUrl = imageError || !hotel.image ? defaultImage : hotel.image;
+
+  const handleImageError = () => {
+    setImageError(true);
+    setImageLoading(false);
+  };
+
+  const handleImageLoad = () => {
+    setImageLoading(false);
+  };
+
+  // ✅ 3. 하트 클릭 핸들러 (내 코드의 API 로직 유지)
   const handleHeartClick = async (e) => {
     e.stopPropagation();
     
@@ -29,7 +43,7 @@ const HotelCard = ({ hotel }) => {
     const token = localStorage.getItem('token');
     if (!token) {
       alert("로그인이 필요합니다.");
-      return; // 로그인 페이지로 보내거나 여기서 멈춤
+      return; 
     }
 
     try {
@@ -77,14 +91,23 @@ const HotelCard = ({ hotel }) => {
   return (
     <div className="hotel-card">
       <div className="hotel-image-wrapper">
-        {/* 이미지가 없을 때를 대비한 기본 이미지 처리 */}
-        <img 
-          src={hotel.image || 'https://via.placeholder.com/400x300?text=No+Image'} 
-          alt={hotel.name} 
-          className="hotel-image"
-          onError={(e) => { e.target.src = 'https://via.placeholder.com/400x300?text=Error'; }}
+        {/* ✅ 최신 코드의 로딩 UI 적용: 이미지가 로딩 중일 때 텍스트 표시 */}
+        {imageLoading && (
+          <div className="image-placeholder">
+            <span>{hotel.name}</span>
+          </div>
+        )}
+        
+        <img
+          src={imageUrl}
+          alt={hotel.name}
+          className={`hotel-image ${imageLoading ? 'loading' : ''}`}
+          onError={handleImageError}
+          onLoad={handleImageLoad}
         />
+        
         <div className="image-badge">{hotel.imageCount || 0} images</div>
+        
         <button
           className={`heart-button ${isFavorited ? 'favorited' : ''}`}
           onClick={handleHeartClick}
@@ -92,8 +115,10 @@ const HotelCard = ({ hotel }) => {
           <FiHeart />
         </button>
       </div>
+
       <div className="hotel-info">
         <h3 className="hotel-name">{hotel.name}</h3>
+        {/* 안전한 데이터 접근 (내 코드 방식 유지) */}
         <p className="hotel-price">
           ₩{(hotel.price || 0).toLocaleString()}/night excl. tax
         </p>

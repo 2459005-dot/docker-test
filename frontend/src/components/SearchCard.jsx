@@ -7,7 +7,6 @@ import { useNavigate } from 'react-router-dom';
 import 'react-day-picker/dist/style.css';
 import './style/SearchCard.scss';
 
-// ... (destinationOptions 배열은 그대로 유지) ...
 const destinationOptions = [
   '서울, 대한민국',
   '부산, 대한민국',
@@ -26,14 +25,14 @@ const SearchCard = () => {
   const [destinationQuery, setDestinationQuery] = useState('');
   const [isDestinationOpen, setDestinationOpen] = useState(false);
 
-  // ✅ [수정 1] 날짜 기본값을 비워둠 (undefined)
+  // 날짜 초기값: 실제 서비스에 맞게 비워둠
   const [dateRange, setDateRange] = useState({
     from: undefined,
     to: undefined,
   });
 
   const [isCalendarOpen, setCalendarOpen] = useState(false);
-  // ✅ [추가] 어떤 필드를 클릭했는지 추적 ('from' | 'to' | null)
+  // 체크인/체크아웃 중 어디를 눌렀는지 추적 ('from' | 'to' | null)
   const [activeDateInput, setActiveDateInput] = useState(null);
 
   const [guestOption, setGuestOption] = useState({ rooms: 1, guests: 2 });
@@ -49,7 +48,6 @@ const SearchCard = () => {
   const checkIn = dateRange?.from;
   const checkOut = dateRange?.to;
 
-  // ... (filteredDestinations useMemo 그대로 유지) ...
   const filteredDestinations = useMemo(() => {
     if (!destinationQuery.trim()) return destinationOptions;
     return destinationOptions.filter((item) =>
@@ -57,7 +55,6 @@ const SearchCard = () => {
     );
   }, [destinationQuery]);
 
-  // ... (handleClickOutside useEffect 그대로 유지) ...
   useEffect(() => {
     if (isDestinationOpen) {
       destinationSearchRef.current?.focus();
@@ -75,7 +72,7 @@ const SearchCard = () => {
 
       if (isCalendarOpen && !isInsideCalendar) {
         setCalendarOpen(false);
-        setActiveDateInput(null); // 닫히면 포커스 해제
+        setActiveDateInput(null);
       }
 
       if (guestRef.current && !guestRef.current.contains(event.target)) {
@@ -87,11 +84,10 @@ const SearchCard = () => {
     return () => document.removeEventListener('click', handleClickOutside);
   }, [isCalendarOpen]);
 
-  // ✅ [수정] 날짜 자동 조정 로직 (역전 방지)
+  // 체크아웃 날짜 역전 방지
   useEffect(() => {
     if (checkIn && checkOut && checkOut <= checkIn) {
-        // 체크아웃이 체크인보다 빠르면 체크아웃을 초기화
-        setDateRange({ from: checkIn, to: undefined });
+      setDateRange({ from: checkIn, to: undefined });
     }
   }, [checkIn, checkOut]);
 
@@ -101,22 +97,18 @@ const SearchCard = () => {
   const formattedCheckIn = formatDateLabel(checkIn, '날짜 선택');
   const formattedCheckOut = formatDateLabel(checkOut, '날짜 선택');
 
-  // ✅ [수정] 달력 날짜 선택 핸들러
   const handleCalendarChange = (range, selectedDay) => {
-    
-    // 1. [핵심] '체크인' 입력창이 활성화된 상태라면?
-    // 라이브러리가 계산한 range는 무시하고, 클릭한 날짜를 무조건 '새로운 시작일'로 설정
+    // 체크인 입력창이 활성화된 상태에서 날짜를 누르면 -> 시작일로 설정하고 체크아웃 모드로 전환
     if (activeDateInput === 'from' && selectedDay) {
-        setDateRange({ from: selectedDay, to: undefined }); // 끝 날짜 초기화
-        setActiveDateInput('to'); // 바로 체크아웃 선택 모드로 전환
-        return;
+      setDateRange({ from: selectedDay, to: undefined });
+      setActiveDateInput('to');
+      return;
     }
 
-    // 2. '체크아웃' 입력창이 활성화된 상태라면?
-    // 기존 로직대로 range를 따라가되, 날짜 순서가 꼬이면 라이브러리가 알아서 뒤집어준 걸 씁니다.
+    // 체크아웃 입력창이거나 일반적인 경우
     setDateRange(range || { from: undefined, to: undefined });
 
-    // 3. 둘 다 선택되면 닫기 (0.2초 딜레이)
+    // 시작일과 종료일이 모두 선택되면 자동 닫기
     if (range?.from && range?.to) {
       setTimeout(() => {
         setCalendarOpen(false);
@@ -125,39 +117,33 @@ const SearchCard = () => {
     }
   };
 
-  // ✅ [수정] 체크인/체크아웃 버튼 클릭 핸들러 분리
   const handleOpenCheckIn = (event) => {
     event.stopPropagation();
     setCalendarOpen(true);
-    setActiveDateInput('from'); // 체크인 활성화
+    setActiveDateInput('from');
     setDestinationOpen(false);
     setGuestOpen(false);
-    
-    // 체크인을 누르면 "새로운 여행 시작"의 의미가 강하므로 기존 날짜 리셋 (선택사항)
-    // setDateRange({ from: undefined, to: undefined }); 
   };
 
   const handleOpenCheckOut = (event) => {
     event.stopPropagation();
-    
-    // 체크인이 없는데 체크아웃을 누르면 -> 체크인부터 찍게 유도
+    // 체크인 날짜가 없으면 체크인부터 선택하게 유도
     if (!checkIn) {
-        setCalendarOpen(true);
-        setActiveDateInput('from');
-        setDestinationOpen(false);
-        setGuestOpen(false);
-        return;
+      setCalendarOpen(true);
+      setActiveDateInput('from');
+      setDestinationOpen(false);
+      setGuestOpen(false);
+      return;
     }
-
     setCalendarOpen(true);
-    setActiveDateInput('to'); // 체크아웃 활성화
+    setActiveDateInput('to');
     setDestinationOpen(false);
     setGuestOpen(false);
   };
 
   const handleResetDates = () => {
     setDateRange({ from: undefined, to: undefined });
-    setActiveDateInput('from'); // 초기화하면 체크인부터 다시
+    setActiveDateInput('from');
   };
 
   const handleApplyDates = () => {
@@ -165,20 +151,15 @@ const SearchCard = () => {
     setActiveDateInput(null);
   };
 
-  // ... (나머지 handleApplyGuests, handleSearch 등 그대로 유지) ...
   const handleApplyGuests = () => {
     setGuestOpen(false);
   };
 
   const handleSearch = () => {
-    // 🚨 [수정 2] 검색 우선순위 정리
-    // 1순위: 지금 입력창에 있는 글자 (destinationQuery)
-    // 2순위: 드롭다운에서 선택했던 글자 (destination)
-    // trim()으로 앞뒤 공백 제거
     const finalDestination = destinationQuery?.trim() || destination?.trim();
 
     if (!finalDestination) {
-      alert('목적지를 입력해주세요.'); // 도시 선택 안 하고 검색 누르면 경고
+      alert('목적지를 입력해주세요.');
       return;
     }
 
@@ -189,7 +170,7 @@ const SearchCard = () => {
     if (checkOut) params.set('checkOut', format(checkOut, 'yyyy-MM-dd'));
     params.set('rooms', guestOption.rooms.toString());
     params.set('guests', guestOption.guests.toString());
-    
+
     navigate(`/search?${params.toString()}`);
   };
 
@@ -199,7 +180,7 @@ const SearchCard = () => {
         <label>어디에 머무르시나요?</label>
         <div className="search-row">
           
-          {/* ... (목적지 필드 부분 그대로 유지) ... */}
+          {/* 목적지 입력 필드 */}
           <div className="field" ref={destinationRef}>
             <FiMapPin />
             <div className="field-content">
@@ -235,26 +216,31 @@ const SearchCard = () => {
             </div>
             {isDestinationOpen && (
               <div className="destination-dropdown" onMouseDown={(e) => e.stopPropagation()}>
-                 {/* ... 드롭다운 내용 그대로 ... */}
-                 <div className="destination-list">
-                  {filteredDestinations.map(item => (
-                      <button className="destination-item" key={item} type="button" 
-                        onMouseDown={() => {
-                            setDestination(item);
-                            setDestinationQuery(item);
-                            setDestinationOpen(false);
-                        }}>{item}</button>
+                <div className="destination-list">
+                  {filteredDestinations.map((item) => (
+                    <button
+                      className="destination-item"
+                      key={item}
+                      type="button"
+                      onMouseDown={() => {
+                        setDestination(item);
+                        setDestinationQuery(item);
+                        setDestinationOpen(false);
+                      }}
+                    >
+                      {item}
+                    </button>
                   ))}
-                 </div>
+                </div>
               </div>
             )}
           </div>
 
+          {/* 날짜 선택 필드 */}
           <div className="date-range-wrapper" ref={checkInFieldRef}>
             <div className="date-range-container">
-              {/* ✅ [수정] 체크인 필드 - 클릭 시 handleOpenCheckIn 실행 */}
-              <div 
-                className={`field ${activeDateInput === 'from' ? 'active-input' : ''}`} 
+              <div
+                className={`field ${activeDateInput === 'from' ? 'active-input' : ''}`}
                 onClick={handleOpenCheckIn}
               >
                 <FiCalendar />
@@ -265,11 +251,9 @@ const SearchCard = () => {
                   </button>
                 </div>
               </div>
-
-              {/* ✅ [수정] 체크아웃 필드 - 클릭 시 handleOpenCheckOut 실행 */}
-              <div 
-                className={`field ${activeDateInput === 'to' ? 'active-input' : ''}`} 
-                ref={checkOutFieldRef} 
+              <div
+                className={`field ${activeDateInput === 'to' ? 'active-input' : ''}`}
+                ref={checkOutFieldRef}
                 onClick={handleOpenCheckOut}
               >
                 <FiCalendar />
@@ -298,48 +282,81 @@ const SearchCard = () => {
                   className="rdp"
                 />
                 <div className="calendar-actions">
-                  <button className="btn reset" type="button" onClick={handleResetDates}>초기화</button>
-                  <button className="btn primary apply" type="button" onClick={handleApplyDates}>완료</button>
+                  <button className="btn reset" type="button" onClick={handleResetDates}>
+                    초기화
+                  </button>
+                  <button className="btn primary apply" type="button" onClick={handleApplyDates}>
+                    완료
+                  </button>
                 </div>
               </div>
             )}
           </div>
 
-          {/* ... (인원 선택 필드 그대로 유지) ... */}
+          {/* 인원 선택 필드 */}
           <div className="field" ref={guestRef}>
             <FiUsers />
             <div className="field-content">
               <span>객실 및 투숙객</span>
-              <button className="guest-button" type="button" onClick={(e) => {
+              <button
+                className="guest-button"
+                type="button"
+                onClick={(e) => {
                   e.stopPropagation();
                   setGuestOpen(!isGuestOpen);
                   setDestinationOpen(false);
                   setCalendarOpen(false);
-              }}>
+                }}
+              >
                 객실 {guestOption.rooms}개, 투숙객 {guestOption.guests}명
               </button>
             </div>
             {isGuestOpen && (
-                <div className="guest-dropdown" onClick={(e) => e.stopPropagation()}>
-                    {/* ... (카운터 UI 그대로 유지) ... */}
-                    <div className="guest-row">
-                        <span className="guest-label">객실</span>
-                        <div className="counter-controls">
-                            <button type="button" onClick={() => setGuestOption(p => ({...p, rooms: Math.max(1, p.rooms-1)}))}>-</button>
-                            <span>{guestOption.rooms}</span>
-                            <button type="button" onClick={() => setGuestOption(p => ({...p, rooms: p.rooms+1}))}>+</button>
-                        </div>
-                    </div>
-                    <div className="guest-row">
-                        <span className="guest-label">투숙객</span>
-                        <div className="counter-controls">
-                            <button type="button" onClick={() => setGuestOption(p => ({...p, guests: Math.max(1, p.guests-1)}))}>-</button>
-                            <span>{guestOption.guests}</span>
-                            <button type="button" onClick={() => setGuestOption(p => ({...p, guests: p.guests+1}))}>+</button>
-                        </div>
-                    </div>
-                    <button className="btn primary apply" type="button" onClick={handleApplyGuests}>완료</button>
+              <div className="guest-dropdown" onClick={(e) => e.stopPropagation()}>
+                <div className="guest-row">
+                  <span className="guest-label">객실</span>
+                  <div className="counter-controls">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setGuestOption((p) => ({ ...p, rooms: Math.max(1, p.rooms - 1) }))
+                      }
+                    >
+                      -
+                    </button>
+                    <span>{guestOption.rooms}</span>
+                    <button
+                      type="button"
+                      onClick={() => setGuestOption((p) => ({ ...p, rooms: p.rooms + 1 }))}
+                    >
+                      +
+                    </button>
+                  </div>
                 </div>
+                <div className="guest-row">
+                  <span className="guest-label">투숙객</span>
+                  <div className="counter-controls">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setGuestOption((p) => ({ ...p, guests: Math.max(1, p.guests - 1) }))
+                      }
+                    >
+                      -
+                    </button>
+                    <span>{guestOption.guests}</span>
+                    <button
+                      type="button"
+                      onClick={() => setGuestOption((p) => ({ ...p, guests: p.guests + 1 }))}
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
+                <button className="btn primary apply" type="button" onClick={handleApplyGuests}>
+                  완료
+                </button>
+              </div>
             )}
           </div>
 
