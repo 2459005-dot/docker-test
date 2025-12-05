@@ -5,7 +5,7 @@ const lodgingSchema = new mongoose.Schema(
     // =========================================================
     // 1. 사업자 백엔드 기준 (필드명 및 구조 일치시킴)
     // =========================================================
-    
+
     // 숙소 이름 (name -> lodgingName 변경됨)
     lodgingName: {
       type: String,
@@ -13,14 +13,14 @@ const lodgingSchema = new mongoose.Schema(
       trim: true,
       maxlength: 50
     },
-    
+
     address: {
       type: String,
       required: true,
       trim: true,
       maxlength: 255
     },
-    
+
     starRating: {
       type: Number,
       required: true,
@@ -28,43 +28,43 @@ const lodgingSchema = new mongoose.Schema(
       max: 5,
       default: 3
     },
-    
+
     description: {
       type: String,
       required: true,
       trim: true
     },
-    
+
     images: {
       type: [String],
       default: [],
       trim: true
     },
-    
+
     country: {
       type: String,
       required: true,
       trim: true,
       maxlength: 50
     },
-    
+
     category: {
       type: String,
       enum: ["호텔", "모텔", "리조트", "게스트하우스", "에어비앤비"],
       required: true
     },
-    
+
     // 해시태그 (hashtags -> hashtag 변경됨)
     hashtag: {
       type: [String],
       default: [],
       trim: true,
     },
-    
+
     // 사업자 ID (String -> ObjectId 변경됨)
     businessId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'Business', 
+      ref: 'Business',
       required: true,
       index: true
     },
@@ -75,7 +75,7 @@ const lodgingSchema = new mongoose.Schema(
       ref: 'Amenity',
       required: false
     },
-    
+
     bookingId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Booking',
@@ -87,13 +87,19 @@ const lodgingSchema = new mongoose.Schema(
     // =========================================================
 
     // 📍 지도 좌표 (지도 서비스 필수)
-    lat: { type: Number }, 
-    lng: { type: Number }, 
+    lat: { type: Number },
+    lng: { type: Number },
 
     // 📊 통계 정보 (정렬 및 필터링용 - 리뷰 작성 시 업데이트됨)
     rating: { type: Number, default: 0, index: -1 }, // 평점
     reviewCount: { type: Number, default: 0 },       // 리뷰 수
     minPrice: { type: Number, default: 0, index: 1 }, // 최저가
+
+    maxGuests: {
+      type: Number,
+      default: 2, // 기본값
+      index: true // 검색 속도 향상
+    },
 
     // ⏰ 이용 시간 (UI 표시용)
     checkInTime: { type: String, default: "15:00" },

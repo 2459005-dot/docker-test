@@ -6,32 +6,38 @@ const { successResponse, errorResponse } = require("../common/response");
 // 1. 숙소 목록 조회 (검색 기능 포함)
 exports.getLodgings = async (req, res) => {
   try {
-    const { loc, checkIn, checkOut, category } = req.query;
+    // guests 파라미터 추가
+    const { loc, checkIn, checkOut, category, guests } = req.query;
+
     let query = {};
 
-    // 지역(loc) 검색 로직 (포함 검색)
+    // 1. 지역 검색 (기존 유지)
     if (loc) {
       query.$or = [
-        { address: { $regex: loc, $options: 'i' } },      // 주소
-        { country: { $regex: loc, $options: 'i' } },      // 나라
-        { lodgingName: { $regex: loc, $options: 'i' } },  // 이름
-        { hashtag: { $regex: loc, $options: 'i' } }       // 해시태그
+        { address: { $regex: loc, $options: 'i' } },
+        { country: { $regex: loc, $options: 'i' } },
+        { lodgingName: { $regex: loc, $options: 'i' } },
+        { hashtag: { $regex: loc, $options: 'i' } }
       ];
     }
 
-    // 카테고리 필터
+    // 2. 카테고리 (기존 유지)
     if (category) {
       query.category = category;
     }
 
+    // ✅ 3. 인원 수 필터링 (추가됨!)
+    // "숙소의 최대 수용 인원"이 "검색한 인원"보다 크거나 같아야 함
+    if (guests) {
+      query.maxGuests = { $gte: parseInt(guests) };
+    }
+
     const lodgings = await Lodging.find(query);
 
-    // 검색 결과가 없어도 빈 배열([])을 보내줘야 프론트가 에러 안 남
     res.status(200).json(successResponse(lodgings || [], `${lodgings.length}개 발견`));
 
   } catch (err) {
-    console.error(err);
-    res.status(500).json(errorResponse(err.message, 500));
+    // ... 에러 처리
   }
 };
 
@@ -39,7 +45,7 @@ exports.getLodgings = async (req, res) => {
 exports.getLodgingDetail = async (req, res) => {
   try {
     const { id } = req.params;
-    
+
     // DB에서 ID로 찾기
     const lodging = await Lodging.findById(id);
 

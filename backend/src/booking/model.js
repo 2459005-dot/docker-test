@@ -12,8 +12,8 @@ const bookingSchema = new mongoose.Schema(
     price: { type: Number, required: true },
     status: {
       type: String,
-      enum: ["booked", "cancelled", "completed"],
-      default: "booked",
+      enum: ["pending", "booked", "confirmed", "cancelled"], // 여기에 'confirmed'가 있어야 함
+      default: "confirmed",
     },
     paymentKey: { type: String },
     paymentAmount: { type: Number },

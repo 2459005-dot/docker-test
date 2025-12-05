@@ -2,7 +2,7 @@ require('dotenv').config();
 const express = require("express");
 const cors = require("cors");
 const cookieParser = require('cookie-parser');
-const passport = require('./src/config/passport'); // 🚨 경로 변경됨!
+const passport = require('./src/config/passport'); 
 
 // ✅ DB 연결 함수
 const connectDB = require("./src/config/db");
@@ -14,6 +14,7 @@ const roomRoutes = require("./src/room/route");
 const bookingRoutes = require("./src/booking/route");
 const reviewRoutes = require("./src/review/route");
 const bookmarkRoutes = require("./src/bookmark/route");
+const paymentRoutes = require("./src/payment/route"); 
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -34,6 +35,7 @@ app.use("/api/rooms", roomRoutes);
 app.use("/api/bookings", bookingRoutes);
 app.use("/api/reviews", reviewRoutes);
 app.use("/api/bookmarks", bookmarkRoutes);
+app.use("/api/payments", paymentRoutes);
 
 // 에러 핸들링
 app.use((req, res, next) => res.status(404).json({ success: false, message: 'Not Found' }));

@@ -24,7 +24,7 @@ const SearchHeader = () => {
   const [searchParams, setSearchParams] = useSearchParams();
 
   // URL 쿼리 파라미터에서 검색 값 읽기
-  const destinationParam = searchParams.get('destination') || '서울, 대한민국';
+  const destinationParam = searchParams.get('destination') || '';
   const checkInParam = searchParams.get('checkIn');
   const checkOutParam = searchParams.get('checkOut');
   const roomsParam = searchParams.get('rooms') || '1';

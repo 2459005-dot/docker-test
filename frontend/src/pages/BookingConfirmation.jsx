@@ -136,14 +136,14 @@ const BookingConfirmation = () => {
     <div className="booking-confirmation-page">
       <Header />
       <div className="booking-confirmation-container">
-        <div className="breadcrumbs">
+        {/* <div className="breadcrumbs">
           {breadcrumbItems.map((item, index) => (
             <React.Fragment key={index}>
               <span>{item}</span>
               {index < breadcrumbItems.length - 1 && <span className="separator">&gt;</span>}
             </React.Fragment>
           ))}
-        </div>
+        </div> */}
 
         {/* 예약 내역 리스트 (토글) */}
         {bookingHistory.length > 0 && (

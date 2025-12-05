@@ -2,85 +2,97 @@ import React, { useState, useEffect } from 'react';
 import Header from '../components/Header';
 import HotelCard from '../components/HotelCard';
 import Footer from '../components/Footer';
-// ❌ 가짜 데이터 import 삭제: import { allHotelsData } from './SearchResults';
-import { getLodgingDetail } from '../api/lodgingApi'; // ✅ API import
+import { getLodgingDetail } from '../api/lodgingApi';
+import { getFavorites } from '../api/favoriteApi';
 import './style/Favorites.scss';
 
 const Favorites = () => {
-  // 찜한 숙소 ID 목록 (로컬 스토리지)
-  const [favoriteIds, setFavoriteIds] = useState(() => {
-    return JSON.parse(localStorage.getItem('favorites') || '[]');
-  });
-
-  // 실제 숙소 데이터를 담을 State
   const [favoriteHotels, setFavoriteHotels] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // 1. 로컬 스토리지 변경 감지 (다른 탭이나 헤더에서 변경 시 동기화)
   useEffect(() => {
-    const handleStorageChange = () => {
-      setFavoriteIds(JSON.parse(localStorage.getItem('favorites') || '[]'));
-    };
-
-    window.addEventListener('storage', handleStorageChange);
-    // 같은 탭 내 변경 감지용 (커스텀 이벤트)
-    window.addEventListener('favoritesChanged', handleStorageChange);
-
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
-      window.removeEventListener('favoritesChanged', handleStorageChange);
-    };
-  }, []);
-
-  // 2. ID 목록이 바뀔 때마다 백엔드에서 데이터 새로 불러오기
-  useEffect(() => {
-    const fetchFavoriteHotels = async () => {
-      if (favoriteIds.length === 0) {
-        setFavoriteHotels([]);
-        setLoading(false);
-        return;
-      }
-
+    const fetchMyFavorites = async () => {
       try {
         setLoading(true);
-        // 저장된 모든 ID에 대해 상세 정보 요청을 병렬로 보냄
-        const promises = favoriteIds.map(id => getLodgingDetail(id));
-        const responses = await Promise.all(promises);
+        
+        // 1. 백엔드에서 찜 목록 가져오기
+        const response = await getFavorites();
+        
+        // 데이터 안전하게 꺼내기
+        const bookmarks = response.data || response || [];
 
-        // 성공한 응답만 추려서 데이터 변환
-        const validHotels = responses
-          .filter(res => res && res.success) // 응답이 성공인 것만 필터링
-          .map(res => {
-            const hotel = res.data;
-            // HotelCard 형식에 맞게 데이터 매핑
-            return {
-              id: hotel._id,
-              name: hotel.lodgingName,
-              price: hotel.minPrice || 0,
-              address: hotel.address,
-              destination: hotel.country,
-              type: hotel.category,
-              starRating: hotel.starRating,
-              reviewScore: hotel.rating || 0,
-              reviewCount: hotel.reviewCount || 0,
-              // 이미지가 있으면 첫 번째 것, 없으면 기본 이미지
-              image: (hotel.images && hotel.images.length > 0) 
-                ? hotel.images[0] 
-                : 'https://images.unsplash.com/photo-1566073771259-6a8506099945',
-              freebies: { wifi: true } // UI 깨짐 방지용
-            };
-          });
+        // 🚨 [추가된 부분] DB 데이터를 가져오자마자 로컬스토리지도 똑같이 맞춰줍니다!
+        // 이렇게 하면 HotelCard가 로컬스토리지를 확인할 때 "어? 나 찜 되어있네!" 하고 하트를 채웁니다.
+        const latestIds = bookmarks.map(item => item._id || item.lodgingId);
+        localStorage.setItem('favorites', JSON.stringify(latestIds));
+        // 다른 컴포넌트(헤더 등)에도 변경사항 알리기
+        window.dispatchEvent(new Event('storage'));
 
-        setFavoriteHotels(validHotels);
+
+        if (bookmarks.length === 0) {
+          setFavoriteHotels([]);
+          setLoading(false);
+          return;
+        }
+
+        // 2. 상세 정보 로딩 (기존 로직 유지)
+        // CASE A: 백엔드가 상세 정보를 다 준 경우
+        if (bookmarks[0].lodgingName || bookmarks[0].name) {
+             const mappedHotels = bookmarks.map(hotel => ({
+                id: hotel._id || hotel.lodgingId,
+                name: hotel.lodgingName || hotel.name,
+                price: hotel.minPrice || 0,
+                address: hotel.address,
+                destination: hotel.country,
+                type: hotel.category,
+                starRating: hotel.starRating,
+                reviewScore: hotel.rating || 0,
+                reviewCount: hotel.reviewCount || 0,
+                image: (hotel.images && hotel.images.length > 0) 
+                  ? hotel.images[0] 
+                  : 'https://images.unsplash.com/photo-1566073771259-6a8506099945',
+                freebies: { wifi: true }
+             }));
+             setFavoriteHotels(mappedHotels);
+        } 
+        // CASE B: ID만 준 경우
+        else {
+            const promises = latestIds.map(id => getLodgingDetail(id));
+            const responses = await Promise.all(promises);
+            
+            const validHotels = responses
+              .filter(res => res && res.success)
+              .map(res => {
+                const hotel = res.data;
+                return {
+                  id: hotel._id,
+                  name: hotel.lodgingName,
+                  price: hotel.minPrice || 0,
+                  address: hotel.address,
+                  destination: hotel.country,
+                  type: hotel.category,
+                  starRating: hotel.starRating,
+                  reviewScore: hotel.rating || 0,
+                  reviewCount: hotel.reviewCount || 0,
+                  image: (hotel.images && hotel.images.length > 0) 
+                    ? hotel.images[0] 
+                    : 'https://images.unsplash.com/photo-1566073771259-6a8506099945',
+                  freebies: { wifi: true }
+                };
+              });
+            setFavoriteHotels(validHotels);
+        }
+
       } catch (error) {
         console.error("찜 목록 로딩 실패:", error);
+        setFavoriteHotels([]); 
       } finally {
         setLoading(false);
       }
     };
 
-    fetchFavoriteHotels();
-  }, [favoriteIds]);
+    fetchMyFavorites();
+  }, []);
 
   return (
     <div className="favorites-page">
