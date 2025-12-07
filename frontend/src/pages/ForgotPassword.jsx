@@ -1,19 +1,24 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { forgotPassword } from '../api/authApi'; // ✅ API import
 import { FiArrowLeft } from 'react-icons/fi';
+// 디자인(new.txt)과 기능(mine.txt)에 필요한 아이콘 모두 Import
 import { FaFacebook, FaGoogle, FaApple } from 'react-icons/fa';
 import { RiKakaoTalkFill } from 'react-icons/ri';
+// ✅ 기능 핵심: API 함수 (mine.txt 유지)
+import { forgotPassword } from '../api/authApi';
 import './style/Login.scss';
 
 const ForgotPassword = () => {
   const navigate = useNavigate();
+
+  // 상태 관리 (mine.txt의 로직: 임시 비밀번호 저장용 state 사용)
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
-  const [tempPassword, setTempPassword] = useState(''); // 임시 비번 저장용
+  const [tempPassword, setTempPassword] = useState(''); // mine.txt의 핵심 State
   const [error, setError] = useState('');
   const [isSubmitted, setIsSubmitted] = useState(false);
 
+  // ✅ 폼 제출 핸들러 (mine.txt의 백엔드 통신 로직 사용)
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
@@ -25,11 +30,11 @@ const ForgotPassword = () => {
     }
 
     try {
-      // ✅ 백엔드 요청
+      // mine.txt: 백엔드에 임시 비밀번호 요청
       const response = await forgotPassword({ email, name });
 
       if (response.success) {
-        setTempPassword(response.data.tempPassword); // 임시 비번 받아서 저장
+        setTempPassword(response.data.tempPassword); // 받아온 임시 비번 저장
         setIsSubmitted(true);
       } else {
         setError(response.message || '일치하는 사용자 정보를 찾을 수 없습니다.');
@@ -40,11 +45,10 @@ const ForgotPassword = () => {
     }
   };
 
-  // ... (소셜 로그인 핸들러 필요 시 추가)
+  // ✅ 소셜 로그인 핸들러 (mine.txt 기능 유지)
   const handleSocialLogin = (provider) => {
     window.location.href = `http://localhost:3000/api/auth/${provider}`;
   };
-
   return (
     <div className="auth-page login-page">
       <div className="auth-container">
@@ -56,7 +60,11 @@ const ForgotPassword = () => {
             </Link>
 
             <h1 className="auth-title">비밀번호 찾기</h1>
-            <p className="auth-subtitle">가입한 이메일과 이름을 입력하세요.<br/>임시 비밀번호가 발급됩니다.</p>
+            {/* 텍스트는 기능 설명이 더 정확한 mine.txt 내용 사용 */}
+            <p className="auth-subtitle">
+              가입한 이메일과 이름을 입력하세요.<br />
+              임시 비밀번호가 발급됩니다.
+            </p>
 
             {!isSubmitted ? (
               <form onSubmit={handleSubmit} className="auth-form">
@@ -93,11 +101,15 @@ const ForgotPassword = () => {
             ) : (
               <div className="password-result">
                 <div className="result-box">
+                  {/* 결과 텍스트: mine.txt (임시 비밀번호 안내) */}
                   <h2>임시 비밀번호 발급 완료</h2>
                   <p className="result-label">아래 비밀번호로 로그인 후 변경해주세요:</p>
-                  <div className="password-display" style={{letterSpacing: '2px', fontSize: '1.2rem'}}>
+
+                  {/* 디자인: new.txt의 password-display 클래스 사용 */}
+                  <div className="password-display" style={{ letterSpacing: '2px', fontSize: '1.2rem' }}>
                     <strong>{tempPassword}</strong>
                   </div>
+
                   <button
                     type="button"
                     className="btn-primary"
@@ -113,27 +125,47 @@ const ForgotPassword = () => {
               <span>Or login with</span>
             </div>
 
+            {/* 소셜 로그인: 디자인 new.txt 구조 + 기능 mine.txt 핸들러 */}
             <div className="social-login">
-              <button type="button" className="social-btn google" onClick={() => handleSocialLogin('google')}>
+              <button
+                type="button"
+                className="social-btn google"
+                onClick={() => handleSocialLogin('google')}
+              >
                 <FaGoogle />
               </button>
-              <button type="button" className="social-btn kakao" onClick={() => handleSocialLogin('kakao')} style={{backgroundColor: '#FEE500', color: '#000'}}>
-                 <RiKakaoTalkFill />
+              {/* mine.txt에만 있는 카카오 버튼 추가 (스타일은 인라인 유지 또는 CSS 추가 필요) */}
+              <button
+                type="button"
+                className="social-btn kakao"
+                onClick={() => handleSocialLogin('kakao')}
+                style={{ backgroundColor: '#FEE500', color: '#000', border: 'none' }}
+              >
+                <RiKakaoTalkFill />
               </button>
-              <button type="button" className="social-btn facebook" onClick={() => alert("준비 중입니다.")}>
+              <button
+                type="button"
+                className="social-btn facebook"
+                onClick={() => alert("준비 중입니다.")}
+              >
                 <FaFacebook />
               </button>
             </div>
           </div>
         </div>
 
+        {/* 이미지 섹션: 디자인 new.txt (Carousel Indicators 포함) */}
         <div className="auth-image-section">
-          {/* 이미지 섹션 그대로 유지 */}
           <div className="image-carousel">
             <img
               src="https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=1200&q=80"
               alt="Resort"
             />
+            <div className="carousel-indicators">
+              <span className="indicator active"></span>
+              <span className="indicator"></span>
+              <span className="indicator"></span>
+            </div>
           </div>
         </div>
       </div>

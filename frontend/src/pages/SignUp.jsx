@@ -1,22 +1,27 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { signup } from '../api/authApi';
 import { FiEye, FiEyeOff } from 'react-icons/fi';
 import { FaFacebook, FaGoogle, FaApple } from 'react-icons/fa';
+import { RiKakaoTalkFill } from 'react-icons/ri';
+
+// ✅ 내 코드(mine.txt)의 핵심 기능 Import
+import { signup, login } from '../api/authApi';
+import { getErrorMessage } from '../api/client';
 import './style/Login.scss';
 
 const SignUp = () => {
   const navigate = useNavigate();
-  
+
+  // 상태 관리 (mine.txt 로직)
   const [formData, setFormData] = useState({
-    firstName: '', 
-    lastName: '',  
+    firstName: '',
+    lastName: '',
     email: '',
     phone: '',
     password: '',
     confirmPassword: '',
   });
-  
+
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [agreed, setAgreed] = useState(false);
@@ -29,7 +34,7 @@ const SignUp = () => {
     });
   };
 
-  // ✅ 회원가입 요청 함수
+  // ✅ 통합된 회원가입 핸들러 (mine.txt 로직 100% 유지)
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
@@ -45,33 +50,72 @@ const SignUp = () => {
     }
 
     try {
-      const response = await signup({
+      // 1. 회원가입 요청
+      const fullName = `${formData.lastName}${formData.firstName}`;
+
+      const signupResponse = await signup({
         email: formData.email,
         password: formData.password,
-        name: `${formData.lastName}${formData.firstName}`, // 이름 합치기
-        phone: formData.phone 
+        name: fullName,
+        phone: formData.phone
       });
 
-      if (response.success || response.resultCode === 201) { 
-        alert('회원가입이 완료되었습니다! 로그인 해주세요.');
-        navigate('/login');
+      // 2. 가입 성공 시 자동 로그인 시도
+      if (signupResponse.success || signupResponse.resultCode === 201) {
+        try {
+          const loginResponse = await login({
+            email: formData.email,
+            password: formData.password
+          });
+
+          if (loginResponse.success || loginResponse.resultCode === 200) {
+            // 데이터 구조 안전하게 처리
+            const responseData = loginResponse.data?.data || loginResponse.data;
+            const token = responseData?.token;
+            const user = responseData?.user;
+
+            if (token) {
+              localStorage.setItem('token', token);
+              localStorage.setItem('isLoggedIn', 'true');
+              if (user) {
+                localStorage.setItem('userInfo', JSON.stringify(user));
+                localStorage.setItem('userName', user.name);
+              }
+
+              window.dispatchEvent(new Event('storage'));
+              window.dispatchEvent(new Event('loginStatusChanged'));
+
+              navigate('/');
+            } else {
+              // 토큰이 없는 경우 (드문 케이스)
+              navigate('/login');
+            }
+          }
+        } catch (loginError) {
+          // 가입은 됐는데 자동 로그인이 실패한 경우
+          alert('회원가입이 완료되었습니다! 로그인 해주세요.');
+          navigate('/login');
+        }
       } else {
-        console.log("❌ 성공 조건문에 걸리지 않음");
+        setError(signupResponse.message || '회원가입에 실패했습니다.');
       }
+
     } catch (err) {
-      const errorMsg = err.response?.data?.message || '회원가입 중 오류가 발생했습니다.';
-      setError(errorMsg);
       console.error('Signup Error:', err);
+      const errorMsg = getErrorMessage(err, '회원가입 중 오류가 발생했습니다.');
+      setError(errorMsg);
     }
   };
 
+  // ✅ 소셜 로그인 핸들러 (mine.txt 로직)
   const handleSocialLogin = (provider) => {
-    window.location.href = `http://localhost:3000/api/auth/${provider}`;
+    window.location.href = `${import.meta.env.VITE_API_URL || 'http://localhost:3000/api'}/auth/${provider}`;
   };
 
   return (
     <div className="auth-page signup-page">
       <div className="auth-container">
+        {/* 1. 이미지 섹션 (디자인 new.txt: 왼쪽에 배치) */}
         <div className="auth-image-section">
           <div className="image-carousel">
             <img
@@ -86,27 +130,31 @@ const SignUp = () => {
           </div>
         </div>
 
+        {/* 2. 폼 섹션 (디자인 new.txt: 오른쪽에 배치) */}
         <div className="auth-form-section">
           <div className="auth-form-wrapper">
             <h1 className="auth-title">회원가입</h1>
 
             <form onSubmit={handleSubmit} className="auth-form">
+              {/* 디자인 new.txt: 이름/성을 한 줄(Row)에 배치 */}
               <div className="form-row">
                 <div className="form-group">
-                   <label htmlFor="lastName">성</label>
-                   <input
-                     type="text"
-                     name="lastName"
-                     value={formData.lastName}
-                     onChange={handleChange}
-                     placeholder="성"
-                     required
-                   />
+                  <label htmlFor="lastName">성</label>
+                  <input
+                    type="text"
+                    id="lastName"
+                    name="lastName"
+                    value={formData.lastName}
+                    onChange={handleChange}
+                    placeholder="성"
+                    required
+                  />
                 </div>
                 <div className="form-group">
                   <label htmlFor="firstName">이름</label>
                   <input
                     type="text"
+                    id="firstName"
                     name="firstName"
                     value={formData.firstName}
                     onChange={handleChange}
@@ -116,11 +164,13 @@ const SignUp = () => {
                 </div>
               </div>
 
+              {/* 디자인 new.txt: 이메일/전화번호를 한 줄(Row)에 배치 */}
               <div className="form-row">
                 <div className="form-group">
                   <label htmlFor="email">이메일</label>
                   <input
                     type="email"
+                    id="email"
                     name="email"
                     value={formData.email}
                     onChange={handleChange}
@@ -132,6 +182,7 @@ const SignUp = () => {
                   <label htmlFor="phone">전화번호</label>
                   <input
                     type="tel"
+                    id="phone"
                     name="phone"
                     value={formData.phone}
                     onChange={handleChange}
@@ -183,7 +234,7 @@ const SignUp = () => {
                 </div>
               </div>
 
-              {error && <div className="error-message" style={{color: 'red', marginBottom: '10px'}}>{error}</div>}
+              {error && <div className="error-message">{error}</div>}
 
               <label className="checkbox-label">
                 <input
@@ -191,7 +242,7 @@ const SignUp = () => {
                   checked={agreed}
                   onChange={(e) => setAgreed(e.target.checked)}
                 />
-                <span>동의하기</span>
+                <span>이용약관 및 개인정보 처리방침에 동의합니다.</span>
               </label>
 
               <button type="submit" className="btn-primary">
@@ -210,15 +261,24 @@ const SignUp = () => {
               <span>또는 다음으로 가입하기</span>
             </div>
 
+            {/* 소셜 로그인: 카카오 포함 (mine.txt 기능 + new.txt 스타일) */}
             <div className="social-login">
               <button type="button" className="social-btn google" onClick={() => handleSocialLogin('google')}>
                 <FaGoogle />
               </button>
-              <button type="button" className="social-btn kakao" onClick={() => handleSocialLogin('kakao')} style={{backgroundColor: '#FEE500', color: '#000'}}>
-                 K
+              <button
+                type="button"
+                className="social-btn kakao"
+                onClick={() => handleSocialLogin('kakao')}
+                style={{ backgroundColor: '#FEE500', color: '#000', border: 'none' }}
+              >
+                <RiKakaoTalkFill />
               </button>
               <button type="button" className="social-btn facebook" onClick={() => alert("준비 중입니다.")}>
                 <FaFacebook />
+              </button>
+              <button type="button" className="social-btn apple" onClick={() => alert("준비 중입니다.")}>
+                <FaApple />
               </button>
             </div>
           </div>

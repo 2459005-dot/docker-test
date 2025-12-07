@@ -10,19 +10,20 @@ import {
 } from 'react-icons/fi';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
-import { getMyBookings } from '../api/bookingApi'; // ✅ API import
+// ✅ 내 코드(mine.txt)의 핵심 기능: API import
+import { getMyBookings } from '../api/bookingApi';
 import './style/BookingConfirmation.scss';
 
 const BookingConfirmation = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  
+
   // 방금 예약한 정보 (Booking.jsx에서 넘어옴)
   const [booking, setBooking] = useState(location.state || null);
-  
+
   // DB에서 가져온 내 예약 내역
   const [bookingHistory, setBookingHistory] = useState([]);
-  const [isHistoryOpen, setIsHistoryOpen] = useState(false); // 기본값은 닫힘으로 변경
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [loading, setLoading] = useState(true);
 
   // 금액 포맷 함수
@@ -31,7 +32,7 @@ const BookingConfirmation = () => {
     return `₩${Number(value).toLocaleString()}`;
   };
 
-  // 날짜 포맷 함수 (ISO String -> 보기 좋은 날짜)
+  // 날짜 포맷 함수
   const formatHistoryDate = (isoString) => {
     if (!isoString) return '-';
     try {
@@ -46,37 +47,49 @@ const BookingConfirmation = () => {
     }
   };
 
-  // ✅ 1. 내 예약 목록 불러오기 (DB 연동)
+  // ✅ 1. 내 예약 목록 불러오기 (mine.txt의 DB 연동 로직 100% 유지)
   useEffect(() => {
     const fetchMyBookings = async () => {
       try {
         setLoading(true);
         const response = await getMyBookings();
-        
+
         if (response.success && response.data.length > 0) {
-          // 백엔드 데이터를 프론트 UI에 맞게 변환 (매핑)
+          // 백엔드 데이터를 프론트 UI에 맞게 변환
           const mappedHistory = response.data.map(item => ({
             bookingNumber: item._id, // 예약 ID
             hotelName: item.lodgingId?.lodgingName || '숙소 정보 없음',
             roomName: item.roomId?.roomName || '객실 정보 없음',
             address: item.lodgingId?.address || '',
-            city: item.lodgingId?.country || '', // 도시 정보가 없으면 국가로 대체
+            city: item.lodgingId?.country || '',
             country: item.lodgingId?.country || '대한민국',
             image: (item.lodgingId?.images && item.lodgingId.images.length > 0) ? item.lodgingId.images[0] : '',
-            
+
             checkInDateLabel: item.checkIn ? new Date(item.checkIn).toLocaleDateString() : '-',
             checkOutDateLabel: item.checkOut ? new Date(item.checkOut).toLocaleDateString() : '-',
             checkInTime: '15:00', // DB에 시간이 없으면 기본값
             checkOutTime: '11:00',
-            
+
             arrivalInfo: item.status === 'confirmed' ? '예약 확정' : '결제 대기',
             guestName: item.userName || 'Guest',
-            guestCount: 2, // 인원 정보 없으면 기본값
-            
+            guestCount: 2, // 기본값
+            guestEmail: item.userEmail || '', // mine.txt 로직에 없으면 빈값 처리
+            guestPhone: item.userPhone || '',
+
             barcode: '|| ||| | |||| |||',
             totalPrice: item.price,
-            paymentMethod: '카드 결제',
-            createdAt: item.createdAt
+            roomCharge: item.price, // 상세 내역용 (세금 등 로직이 없으면 총액과 동일하게)
+            serviceFee: 0,
+            taxes: 0,
+
+            paymentMethod: '카드 결제', // 기본값
+            paymentStatus: item.status === 'confirmed' ? '결제 완료' : '미결제',
+            createdAt: item.createdAt,
+
+            // UI용 추가 필드 (데이터가 없으면 기본값)
+            hotelPhone: item.lodgingId?.phoneNumber || '-',
+            hotelEmail: item.lodgingId?.email || '-',
+            supportHours: '09:00 - 18:00'
           }));
 
           setBookingHistory(mappedHistory);
@@ -115,37 +128,38 @@ const BookingConfirmation = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // 로딩 중이거나 예약 정보가 아예 없을 때
-  if (loading && !booking) return <div style={{padding: '100px', textAlign: 'center'}}>로딩 중...</div>;
+  // 로딩 중이거나 예약 정보가 아예 없을 때 (mine.txt 로직)
+  if (loading && !booking) return <div style={{ padding: '100px', textAlign: 'center' }}>로딩 중...</div>;
+
   if (!booking && !loading) {
     return (
-        <div className="booking-confirmation-page">
-            <Header />
-            <div className="booking-confirmation-container">
-                <div className="not-found" style={{textAlign: 'center', padding: '100px 0'}}>
-                    <h2>예약된 내역이 없습니다.</h2>
-                    <button className="btn primary" onClick={() => navigate('/')} style={{marginTop: '20px'}}>홈으로 가기</button>
-                </div>
-            </div>
-            <Footer />
+      <div className="booking-confirmation-page">
+        <Header />
+        <div className="booking-confirmation-container">
+          <div className="not-found" style={{ textAlign: 'center', padding: '100px 0' }}>
+            <h2>예약된 내역이 없습니다.</h2>
+            <button className="btn primary" onClick={() => navigate('/')} style={{ marginTop: '20px' }}>홈으로 가기</button>
+          </div>
         </div>
+        <Footer />
+      </div>
     );
   }
-
   return (
     <div className="booking-confirmation-page">
       <Header />
       <div className="booking-confirmation-container">
-        {/* <div className="breadcrumbs">
+        {/* Breadcrumbs: 디자인 new.txt */}
+        <div className="breadcrumbs">
           {breadcrumbItems.map((item, index) => (
             <React.Fragment key={index}>
               <span>{item}</span>
               {index < breadcrumbItems.length - 1 && <span className="separator">&gt;</span>}
             </React.Fragment>
           ))}
-        </div> */}
+        </div>
 
-        {/* 예약 내역 리스트 (토글) */}
+        {/* 예약 내역 리스트 (토글): 디자인 new.txt 구조 + 데이터 mine.txt */}
         {bookingHistory.length > 0 && (
           <section className="booking-history-section">
             <div className="section-header">
@@ -192,6 +206,7 @@ const BookingConfirmation = () => {
           </section>
         )}
 
+        {/* Header Section */}
         <div className="confirmation-header">
           <div className="header-info">
             <h1>{booking.hotelName}</h1>
@@ -214,6 +229,7 @@ const BookingConfirmation = () => {
           </div>
         </div>
 
+        {/* Ticket Card: 디자인 new.txt 구조 */}
         <div className="ticket-card">
           <div className="ticket-main">
             <div className="ticket-dates">
@@ -258,6 +274,51 @@ const BookingConfirmation = () => {
                 </div>
                 <div className="barcode">{booking.barcode || '|| ||| | |||| |||'}</div>
               </div>
+
+              {/* Extra Info Cards (new.txt 디자인) */}
+              <div className="ticket-extra">
+                <article className="info-card compact">
+                  <div className="info-card-header">
+                    <h2>게스트 정보</h2>
+                    <span>{`${parseInt(booking.guestCount || 2, 10)}명`}</span>
+                  </div>
+                  <dl>
+                    <div>
+                      <dt>대표 투숙객</dt>
+                      <dd>{booking.guestName}</dd>
+                    </div>
+                    <div>
+                      <dt>연락처</dt>
+                      <dd>{booking.guestPhone || '-'}</dd>
+                    </div>
+                    <div>
+                      <dt>이메일</dt>
+                      <dd>{booking.guestEmail || '-'}</dd>
+                    </div>
+                  </dl>
+                </article>
+
+                <article className="info-card compact">
+                  <div className="info-card-header">
+                    <h2>숙소 연락처</h2>
+                    <span>Info</span>
+                  </div>
+                  <dl>
+                    <div>
+                      <dt>전화번호</dt>
+                      <dd>{booking.hotelPhone || '-'}</dd>
+                    </div>
+                    <div>
+                      <dt>이메일</dt>
+                      <dd>{booking.hotelEmail || '-'}</dd>
+                    </div>
+                    <div>
+                      <dt>운영 시간</dt>
+                      <dd>{booking.supportHours || '-'}</dd>
+                    </div>
+                  </dl>
+                </article>
+              </div>
             </div>
           </div>
 
@@ -292,14 +353,24 @@ const BookingConfirmation = () => {
           </div>
         </div>
 
+        {/* Payment Section (new.txt 디자인) */}
         <section className="payment-section">
           <article className="info-card">
             <div className="info-card-header">
               <h2>결제 상세</h2>
-              <span>{booking.arrivalInfo || '결제 완료'}</span>
+              <span>{booking.paymentStatus || '결제 완료'}</span>
             </div>
             <dl>
               <div>
+                <dt>객실 요금</dt>
+                <dd>{formatCurrency(booking.totalPrice)}</dd>
+              </div>
+              {/* mine.txt에는 세금 분리 로직이 없으므로 필요 시 0 또는 안 보이게 처리 가능 */}
+              <div>
+                <dt>서비스 & 수수료</dt>
+                <dd>{formatCurrency(0)}</dd>
+              </div>
+              <div className="total">
                 <dt>총 결제 금액</dt>
                 <dd>{formatCurrency(booking.totalPrice)}</dd>
               </div>
@@ -311,6 +382,7 @@ const BookingConfirmation = () => {
           </article>
         </section>
 
+        {/* Terms Section (new.txt 디자인) */}
         <section className="terms-section">
           <h2>이용 약관</h2>
           <div className="terms-columns">

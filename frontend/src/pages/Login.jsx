@@ -1,13 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { login } from '../api/authApi'; // ✅ 우리가 만든 API 함수 import
 import { FiEye, FiEyeOff } from 'react-icons/fi';
 import { FaFacebook, FaGoogle, FaApple } from 'react-icons/fa';
 import { RiKakaoTalkFill } from 'react-icons/ri';
+
+// ✅ 내 코드(mine.txt)의 핵심 기능 Import
+import { login } from '../api/authApi';
+import { getErrorMessage } from '../api/client'; // 이제 사용 가능!
 import './style/Login.scss';
 
 const Login = () => {
   const navigate = useNavigate();
+  
+  // 상태 관리 (mine.txt 로직)
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -15,12 +20,14 @@ const Login = () => {
   const [error, setError] = useState('');
   const [currentSlide, setCurrentSlide] = useState(0);
 
+  // 디자인 요소: 슬라이드 이미지 (new.txt)
   const slides = [
     'https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=1200&q=80',
     'https://images.unsplash.com/photo-1571896349842-33c89424de2d?auto=format&fit=crop&w=1200&q=80',
     'https://images.unsplash.com/photo-1564501049412-61c2a3083791?auto=format&fit=crop&w=1200&q=80',
   ];
 
+  // 슬라이드 타이머 (mine.txt 로직)
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentSlide((prev) => (prev + 1) % slides.length);
@@ -29,56 +36,52 @@ const Login = () => {
     return () => clearInterval(timer);
   }, [slides.length]);
 
-  // ✅ 실제 로그인 요청 함수
+  // ✅ 로그인 핸들러 (mine.txt 기능 100% 복구)
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
 
     try {
-      // 1. 백엔드 API 호출
+      // 실제 로그인 API 호출
       const response = await login({ email, password });
 
-      // 🚨 [디버깅] F12 콘솔에서 이 내용을 확인해보세요!
-      console.log("👉 로그인 응답 전체:", response);
-
-      // 2. 성공 처리
-      // success가 true이거나, resultCode가 200이면 성공으로 취급
-      if (response.success || response.resultCode === 200) {
+      // 로그인 성공 시 토큰 및 사용자 정보 저장
+      // Backend 응답 구조 대응: response.data.token 또는 response.data.data.token
+      // (mine.txt에 있던 안전한 로직 그대로 적용)
+      if (response.data?.token || (response.data?.data && response.data.data.token)) {
+        const token = response.data?.token || response.data?.data?.token;
+        const user = response.data?.user || response.data?.data?.user || response.data?.data;
         
-        // 토큰 저장
-        localStorage.setItem('token', response.data.token);
-        
-        if (response.data.user) {
-           localStorage.setItem('userEmail', response.data.user.email);
-           localStorage.setItem('userName', response.data.user.name);
-        }
+        localStorage.setItem('token', token);
         localStorage.setItem('isLoggedIn', 'true');
-
+        if (user) {
+          localStorage.setItem('userInfo', JSON.stringify(user));
+        }
+        
+        // 전역 상태 업데이트 트리거
         window.dispatchEvent(new Event('storage'));
         window.dispatchEvent(new Event('loginStatusChanged'));
-
-        // alert("로그인 되었습니다"); // 확인용 얼럿
-        navigate('/'); // 메인으로 이동
+        
+        navigate('/');
       } else {
-        // 성공 응답이 아닌 경우
-        setError(response.message || '로그인에 실패했습니다.');
-        console.log("❌ 성공 조건 통과 못함:", response);
+          // 성공 응답이지만 토큰이 없는 경우 (예외 처리)
+          setError('로그인 처리에 실패했습니다. (토큰 없음)');
       }
     } catch (err) {
-      console.error("Login Error:", err);
-      const errorMsg = err.response?.data?.message || '이메일 또는 비밀번호가 올바르지 않습니다.';
-      setError(errorMsg);
+      // ✅ api/client.js의 헬퍼 함수 사용
+      setError(getErrorMessage(err, '이메일 또는 비밀번호가 올바르지 않습니다.'));
     }
   };
 
-  // ✅ 소셜 로그인 핸들러
+  // ✅ 소셜 로그인 핸들러 (mine.txt 기능)
   const handleSocialLogin = (provider) => {
-    window.location.href = `http://localhost:3000/api/auth/${provider}`;
+    window.location.href = `${import.meta.env.VITE_API_URL || 'http://localhost:3000/api'}/auth/${provider}`;
   };
 
   return (
     <div className="auth-page login-page">
       <div className="auth-container">
+        {/* 왼쪽: 로그인 폼 섹션 */}
         <div className="auth-form-section">
           <div className="auth-form-wrapper">
             <h1 className="auth-title">Login</h1>
@@ -99,6 +102,7 @@ const Login = () => {
 
               <div className="form-group">
                 <label htmlFor="password">Password</label>
+                {/* 비밀번호 토글 디자인 적용 (new.txt 구조) */}
                 <div className="password-input-wrapper">
                   <input
                     type={showPassword ? 'text' : 'password'}
@@ -149,28 +153,45 @@ const Login = () => {
               <span>Or login with</span>
             </div>
 
+            {/* 소셜 로그인 버튼: 디자인 new.txt + 기능 mine.txt */}
             <div className="social-login">
-              {/* 구글 */}
-              <button type="button" className="social-btn google" onClick={() => handleSocialLogin('google')}>
+              <button 
+                type="button" 
+                className="social-btn google" 
+                onClick={() => handleSocialLogin('google')}
+              >
                 <FaGoogle />
               </button>
 
-              {/* 카카오 (아이콘이 없으면 텍스트 K로 대체하거나 RiKakaoTalkFill 사용) */}
-              <button type="button" className="social-btn kakao" onClick={() => handleSocialLogin('kakao')} style={{ backgroundColor: '#FEE500', color: '#000' }}>
+              <button 
+                type="button" 
+                className="social-btn kakao" 
+                onClick={() => handleSocialLogin('kakao')}
+                style={{ backgroundColor: '#FEE500', color: '#000', border: 'none' }}
+              >
                 <RiKakaoTalkFill />
               </button>
 
-              {/* 페이스북, 애플 (미구현) */}
-              <button type="button" className="social-btn facebook" onClick={() => alert("준비 중입니다.")}>
+              <button 
+                type="button" 
+                className="social-btn facebook" 
+                onClick={() => alert("준비 중입니다.")}
+              >
                 <FaFacebook />
               </button>
-              <button type="button" className="social-btn apple" onClick={() => alert("준비 중입니다.")}>
+              
+              <button 
+                type="button" 
+                className="social-btn apple" 
+                onClick={() => alert("준비 중입니다.")}
+              >
                 <FaApple />
               </button>
             </div>
           </div>
         </div>
 
+        {/* 오른쪽: 이미지 슬라이더 (new.txt 디자인) */}
         <div className="auth-image-section">
           <div className="image-carousel">
             {slides.map((src, index) => (

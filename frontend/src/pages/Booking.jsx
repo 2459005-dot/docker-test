@@ -2,13 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
-import { FiMapPin, FiCalendar, FiUsers } from 'react-icons/fi';
+// 디자인(new.txt)에 사용된 아이콘들 추가
+import { FiMapPin, FiCalendar, FiUsers, FiCreditCard, FiCheckCircle } from 'react-icons/fi';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 
-// ✅ PortOne V2 SDK
+// ✅ PortOne V2 SDK (mine.txt의 핵심 기능)
 import * as PortOne from "@portone/browser-sdk/v2";
 
+// 백엔드 API (mine.txt 기능 유지)
 import { getLodgingDetail, getRooms } from '../api/lodgingApi';
 import { createBooking } from '../api/bookingApi';
 import { getMe } from '../api/authApi';
@@ -20,12 +22,13 @@ const Booking = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
+  // URL 파라미터 파싱
   const checkIn = searchParams.get('checkIn');
   const checkOut = searchParams.get('checkOut');
   const roomsCount = parseInt(searchParams.get('rooms') || '1', 10);
   const guestsCount = parseInt(searchParams.get('guests') || '2', 10);
 
-  // 백엔드 데이터 State
+  // 백엔드 데이터 State (mine.txt 기능 유지)
   const [hotel, setHotel] = useState(null);
   const [room, setRoom] = useState(null);
   const [user, setUser] = useState(null);
@@ -37,13 +40,14 @@ const Booking = () => {
   const [couponMessage, setCouponMessage] = useState('');
   const [discountAmount, setDiscountAmount] = useState(0);
 
-  // UI State
+  // UI State (new.txt의 디자인 로직을 위해 isSummaryVisible 활용)
   const [isSummaryVisible, setIsSummaryVisible] = useState(false);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
 
+  // 수정 모드 여부 (요약 화면이 아닐 때 수정 가능)
   const isEditing = !isSummaryVisible;
 
-  // 데이터 불러오기
+  // 데이터 불러오기 (mine.txt 로직 100% 유지)
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -55,10 +59,12 @@ const Booking = () => {
         ]);
 
         if (hotelRes.success) setHotel(hotelRes.data);
+
         if (roomsRes.success) {
           const foundRoom = roomsRes.data.find(r => r._id === roomId);
           setRoom(foundRoom || roomsRes.data[0]);
         }
+
         if (userRes && userRes.success) {
           setUser(userRes.data);
           if (userRes.data.phoneNumber) {
@@ -77,11 +83,11 @@ const Booking = () => {
 
   // 가격 계산
   const baseFare = room?.price || 0;
-  const taxes = 0;
+  const taxes = 0; // 필요시 로직 추가
   const serviceFee = 0;
   const total = baseFare - discountAmount + taxes + serviceFee;
 
-  // 쿠폰 로직
+  // 쿠폰 로직 (mine.txt 기능 유지)
   const handleApplyCoupon = () => {
     const trimmedCode = couponCode.trim();
     if (!trimmedCode) {
@@ -100,7 +106,7 @@ const Booking = () => {
     }
   };
 
-  // 날짜 포맷
+  // 날짜 포맷 함수
   const formatDate = (dateString) => {
     if (!dateString) return '날짜 선택';
     const date = new Date(dateString);
@@ -119,7 +125,7 @@ const Booking = () => {
   };
 
   // ============================================================
-  // 🚀 포트원 결제 및 예약 요청
+  // 🚀 포트원 결제 및 예약 요청 (mine.txt의 핵심 기능 유지)
   // ============================================================
   const handlePortOnePayment = async () => {
     const storeId = import.meta.env.VITE_PORTONE_STORE_ID;
@@ -132,7 +138,6 @@ const Booking = () => {
 
     try {
       const paymentId = `payment-${crypto.randomUUID()}`;
-
       const response = await PortOne.requestPayment({
         storeId: storeId,
         channelKey: channelKey,
@@ -140,13 +145,10 @@ const Booking = () => {
         orderName: `${hotel.lodgingName} - ${room.roomName}`,
         totalAmount: total,
         currency: "CURRENCY_KRW",
-        
-        // ✅ 카카오페이 등 간편결제용 설정
-        payMethod: "EASY_PAY", 
+        payMethod: "EASY_PAY",
         easyPay: {
-            provider: "KAKAO_PAY",
+          provider: "KAKAO_PAY",
         },
-
         customer: {
           fullName: user?.name || "Guest",
           phoneNumber: phoneNumber,
@@ -174,7 +176,7 @@ const Booking = () => {
       const serverRes = await createBooking(bookingData);
 
       if (serverRes && (serverRes.success || serverRes.resultCode === 201)) {
-        // 성공 시 완료 페이지 이동 payload
+        // 완료 페이지로 이동
         const payload = {
           bookingNumber: serverRes.data._id,
           hotelName: hotel.lodgingName,
@@ -198,33 +200,35 @@ const Booking = () => {
     }
   };
 
-  if (loading) return <div style={{ padding: '100px', textAlign: 'center' }}>로딩 중...</div>;
-  if (!hotel || !room) {
-    return (
-      <div className="booking-page">
-        <Header />
-        <div className="not-found"><p>정보를 찾을 수 없습니다.</p></div>
-        <Footer />
-      </div>
-    );
-  }
-
+  if (loading) return <div className="loading-container">데이터를 불러오는 중입니다...</div>;
+  if (!hotel || !room) return <div className="error-container">호텔 정보를 찾을 수 없습니다.</div>;
   return (
     <div className="booking-page">
       <Header />
+
       <div className="booking-container">
         <div className="booking-main">
-          {/* Breadcrumbs & Title & Hotel Info */}
+          {/* Breadcrumbs: 디자인 new.txt 적용 */}
           <div className="breadcrumbs">
-            <span>{hotel.country}</span> <span className="separator">&gt;</span> <span>{hotel.lodgingName}</span>
+            <span>{hotel.country || '대한민국'}</span>
+            <span className="separator">&gt;</span>
+            <span>{hotel.city || hotel.address.split(' ')[0]}</span>
+            <span className="separator">&gt;</span>
+            <span>{hotel.lodgingName}</span>
           </div>
+
+          {/* Room Title */}
           <div className="room-title-section">
             <h1 className="room-title">{room.roomName}</h1>
             <span className="room-price-header">₩{baseFare.toLocaleString()}/night</span>
           </div>
+
+          {/* Hotel Info Card */}
           <div className="hotel-info-card">
             <h2 className="card-title">{hotel.lodgingName}</h2>
-            <p className="hotel-address"><FiMapPin /> {hotel.address}</p>
+            <p className="hotel-address">
+              <FiMapPin /> {hotel.address}
+            </p>
           </div>
 
           {/* Date Selection */}
@@ -236,7 +240,9 @@ const Booking = () => {
                 <span className="date-value">{checkIn ? formatDate(checkIn) : '날짜 선택'}</span>
               </div>
             </div>
-            <div className="date-building-icon"><div className="building-icon">🏢</div></div>
+            <div className="date-building-icon">
+              <div className="building-icon">🏢</div>
+            </div>
             <div className="date-item">
               <FiCalendar />
               <div className="date-info">
@@ -246,11 +252,21 @@ const Booking = () => {
             </div>
           </div>
 
+          {/* Payment Method Section (new.txt 디자인 + mine.txt 로직 안내) */}
           <div className="payment-method-section">
-            <h2 className="section-title">결제 정보</h2>
-            <p style={{ color: '#666', fontSize: '14px' }}>
-              안전한 결제를 위해 포트원(카카오페이 등) 결제 모듈을 사용합니다.<br />
-              '결제하기' 버튼을 누르면 결제창이 호출됩니다.
+            <h2 className="section-title">결제 방법</h2>
+            <div className="payment-methods-static">
+              <div className="payment-method-card selected">
+                <FiCreditCard className="method-icon" />
+                <div className="method-info">
+                  <span className="method-name">포트원 안전 결제</span>
+                  <span className="method-desc">카카오페이 / 신용카드 / 간편결제 지원</span>
+                </div>
+                <FiCheckCircle className="check-icon" />
+              </div>
+            </div>
+            <p className="payment-helper-text">
+              * 예약 완료 시 결제창이 호출되며, 안전하게 결제가 진행됩니다.
             </p>
           </div>
 
@@ -266,7 +282,11 @@ const Booking = () => {
                 onChange={(e) => setCouponCode(e.target.value)}
                 disabled={!isEditing}
               />
-              <button className="btn primary coupon-button" onClick={handleApplyCoupon} disabled={!isEditing}>
+              <button
+                className="btn primary coupon-button"
+                onClick={handleApplyCoupon}
+                disabled={!isEditing}
+              >
                 적용
               </button>
             </div>
@@ -295,7 +315,7 @@ const Booking = () => {
             <p className="contact-info-helper">입력하신 번호로 예약 확인 문자가 전송됩니다.</p>
           </div>
 
-          {/* Navigation Buttons */}
+          {/* Next/Prev Buttons (화면 전환 로직) */}
           <div className="next-button-container">
             {isEditing ? (
               <button
@@ -316,7 +336,7 @@ const Booking = () => {
           </div>
         </div>
 
-        {/* Booking Summary Panel */}
+        {/* Booking Summary Panel (new.txt 디자인 구조) */}
         <div className={`booking-summary ${isSummaryVisible ? 'active' : 'inactive'}`}>
           <div className="summary-image">
             <img
@@ -348,7 +368,9 @@ const Booking = () => {
                 <span>₩{total.toLocaleString()}</span>
               </div>
             </div>
+
             <div className="summary-actions">
+              {/* 결제 버튼: mine.txt의 기능(Modal Open) 연결 */}
               <button
                 className="btn primary pay-button"
                 disabled={isEditing}
@@ -363,18 +385,21 @@ const Booking = () => {
 
       <Footer />
 
-      {/* Confirmation Modal */}
+      {/* Payment Confirmation Modal (mine.txt 기능 + new.txt 스타일) */}
       {isPaymentModalOpen && (
         <div className="modal-overlay" onClick={() => setIsPaymentModalOpen(false)}>
           <div className="confirm-modal" onClick={(e) => e.stopPropagation()}>
             <h2>결제를 진행하시겠습니까?</h2>
-            <p>총 결제 금액: <strong>₩{total.toLocaleString()}</strong></p>
+            <p className="modal-total-price">총 결제 금액: <strong>₩{total.toLocaleString()}</strong></p>
+            <p className="modal-desc">확인 버튼을 누르면 카카오페이/카드 결제창이 호출됩니다.</p>
+
             <div className="modal-actions">
               <button className="btn secondary" onClick={() => setIsPaymentModalOpen(false)}>
                 취소
               </button>
+              {/* 실제 결제 함수(handlePortOnePayment) 연결 */}
               <button className="btn primary" onClick={handlePortOnePayment}>
-                결제 진행
+                확인 및 결제
               </button>
             </div>
           </div>
